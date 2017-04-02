@@ -1,3 +1,3 @@
 uint8 id
-uint8 distance
+geometry_msgs/Point head_position
 

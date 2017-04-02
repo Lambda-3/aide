@@ -47,12 +47,14 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   Person.msg
+  Skeleton.msg
 )
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
   AddSpeech.srv
+  ResetTrackFace.srv
   TrackFace.srv
   TrackSkeleton.srv
 
@@ -69,6 +71,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   std_msgs  # Or other packages containing msgs
+  geometry_msgs
 )
 
 ################################################

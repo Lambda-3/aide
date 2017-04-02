@@ -2,6 +2,7 @@ from rdflib import Namespace, URIRef
 from rdflib.plugins.sparql import prepareQuery
 
 PATH = "/home/viktor/.rdf/mario"
+LOGPATH = "../log/mario.log"
 PERSONS = Namespace("mario.persons.")
 FACE = Namespace("mario.persons.faces.")
 TYPES = Namespace("mario.types.")
@@ -43,6 +44,8 @@ TRACKED_FACES_QUERY = prepareQuery(
     initNs={"faces": FACE, "boolean": BOOLEAN})
 
 
+
+
 def id_from_face(uri_ref):
     # type: (URIRef) -> str
     """
@@ -65,6 +68,6 @@ def face_from_id(face_id):
 def skeleton_from_id(skel_id):
     """
 
-    :type skel_id: str
+    :type skel_id: int
     """
     return URIRef("mario.skel_tracker.ids.%d" % skel_id)

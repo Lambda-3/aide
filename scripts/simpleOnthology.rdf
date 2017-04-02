@@ -1,0 +1,157 @@
+@prefix mario: <http://prokyon:5000/mario/>.
+@prefix classes: <http://prokyon:5000/mario/classes/>.
+@prefix properties: <http://prokyon:5000/mario/properties/>.
+@prefix functions: <http://prokyon:5000/mario/functions/>.
+@prefix rules: <http://prokyon:5000/mario/rules/>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+
+# Classes
+classes:thing
+    rdfs:label "Most generic entity";
+    rdf:type rdf:Class.
+
+classes:abstract
+    rdfs:label "Abstract entity";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:thing.
+
+classes:physical
+    rdfs:label "Physical entity";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:thing.
+
+classes:person
+    rdfs:label "Abstract person";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:abstract.
+
+classes:speech
+    rdfs:label "A Sentence of speech";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:abstract.
+
+classes:physicalPerson
+    rdfs:label "Physical person";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:physical.
+
+classes:face
+    rdfs:label "A physical face";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:physicalPerson.
+
+classes:skeleton
+    rdfs:label "Physical skeleton";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:physicalPerson.
+
+classes:rule
+    rdfs:label "Rule";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:abstract.
+
+classes:periodicRule
+    rdfs:label "periodic Rule";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:abstract.
+
+classes:reactiveRule
+    rdfs:label "reactive Rule";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:abstract.
+
+classes:queryLanguage
+    rdfs:label "query Language";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:abstract.
+
+classes:sparql
+    rdfs:label "SPARQL";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:queryLanguage.
+
+classes:update
+    rdfs:label "SPARQL Update";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:queryLanguage.
+
+classes:execute
+    rdfs:label "SPARQL with EXECUTE";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:queryLanguage.
+
+classes:executeBulk
+    rdfs:label "SPARQL with Bulk EXECUTE";
+    rdf:type rdf:Class;
+    rdfs:subClassOf classes:queryLanguage.
+
+# Properties
+properties:content
+    rdf:type rdf:Property;
+    rdfs:label "Speech content";
+    rdfs:domain classes:speech;
+    rdfs:range xsd:string.
+
+properties:speaker
+    rdf:type rdf:Property;
+    rdfs:label "Speaker";
+    rdfs:domain classes:speech;
+    rdfs:range classes:person.
+
+properties:name
+    rdf:type rdf:Property;
+    rdfs:label "Name";
+    rdfs:domain classes:person;
+    rdfs:domain classes:rule;
+    rdfs:range xsd:string.
+
+properties:position_x
+    rdf:type rdf:Property;
+    rdfs:label "Position X";
+    rdfs:domain classes:physical;
+    rdfs:range xsd:double.
+
+properties:position_y
+    rdf:type rdf:Property;
+    rdfs:label "Position Y";
+    rdfs:domain classes:physical;
+    rdfs:range xsd:double.
+
+properties:position_z
+    rdf:type rdf:Property;
+    rdfs:label "Position Z";
+    rdfs:domain classes:physical;
+    rdfs:range xsd:double.
+
+properties:belongsTo
+    rdf:type rdf:Property;
+    rdfs:label "Belongs to";
+    rdfs:domain classes:physicalPerson;
+    rdfs:range classes:person.
+
+properties:isTracked
+    rdf:type rdf:Property;
+    rdfs:label "is Tracked";
+    rdfs:domain classes:physicalPerson;
+    rdfs:range xsd:boolean.
+
+properties:content
+    rdf:type rdf:Property;
+    rdfs:label "Rule content";
+    rdfs:domain classes:rule;
+    rdfs:range xsd:string.
+
+properties:description
+    rdf:type rdf:Property;
+    rdfs:label "Rule description";
+    rdfs:domain classes:rule;
+    rdfs:range xsd:string.
+
+
+properties:inLanguage
+    rdf:type rdf:Property;
+    rdfs:label "Query Language";
+    rdfs:domain classes:rule;
+    rdfs:range classes:QueryLanguage.

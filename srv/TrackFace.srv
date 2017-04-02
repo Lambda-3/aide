@@ -1,6 +1,4 @@
 string face_id
 bool is_tracked
-float32 pos_x
-float32 pos_y
-float32 pos_z
+geometry_msgs/Point position
 ---
