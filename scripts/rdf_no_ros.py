@@ -48,8 +48,6 @@ def main():
         running = True
         while running:
             try:
-                logger.info("graph parsed.")
-
                 graph.execute_rules()
                 graph.pprint()
                 time.sleep(3)

@@ -1,15 +1,17 @@
 import logging
 import threading
 
-from flask import Flask
+from flask import Flask, request
 from flask_restful import Api, Resource, reqparse, marshal, abort
 from flask_restful import fields
+from flask_cors import CORS
 
 module_logger = logging.getLogger("mario.rest")
 
 
 class RestApi:
     graph = None
+    logger = None
 
     def __init__(self, graph):
         """
@@ -18,9 +20,11 @@ class RestApi:
         """
         self.app = Flask("asdf", static_url_path="")
         self.api = Api(self.app)
+        CORS(self.app)
         RestApi.graph = graph
         self.graph.print_rules()
         self.logger = logging.getLogger("mario.rest.RestApi")
+        RestApi.logger = self.logger
         self.logger.info("Creating an instance of RestApi.")
 
         # Adding resources
@@ -146,6 +150,7 @@ class RestApi:
     class ClassesResource(Resource):
         def get(self):
             query_result = RestApi.graph.get_all_classes()
+            RestApi.logger.info("GET classes on {} ".format(request.url))
             return marshal(RestApi.rdflib_to_restful(query_result),
                            RestApi.rdf_class_fields, envelope="classes")
 
