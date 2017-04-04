@@ -1,9 +1,11 @@
+import logging
 import math
 import os
 import re
 from abc import ABCMeta, abstractproperty, abstractmethod
 
 import scipy.spatial
+from enum import Enum
 from pyparsing import ParseException
 from rdflib.graph import ConjunctiveGraph
 from rdflib.namespace import RDF, Namespace, RDFS
@@ -13,6 +15,8 @@ from rdflib.term import Literal, URIRef, BNode
 
 from rdf_constants import BOOLEAN, FACE, SKEL_TRACKER, TYPES
 from rdf_constants import id_from_face
+
+module_logger = logging.getLogger("mario.rules")
 
 
 class RuleHandler(ConjunctiveGraph):
@@ -158,7 +162,7 @@ class RuleHandler(ConjunctiveGraph):
         rule_node = BNode()
         self.add((rule_node, RDF.type, URIRef(type)))
         self.add((rule_node, RDFS.label, Literal(name)))
-        self.add((rule_node, self.PROPERTIES.inLanguage, URIRef(language)))
+        self.add((rule_node, self.PROPERTIES.inLanguage, URIRef(language.value)))
         self.add((rule_node, self.PROPERTIES.content, Literal(query)))
         self.add((rule_node, self.PROPERTIES.description, Literal(
             description)))
@@ -181,18 +185,18 @@ class RuleHandler(ConjunctiveGraph):
 
         class GenericPeriodicRule(PeriodicRule):
             name = rule_name
-            if language == self.CLASSES.sparql.toPython():
+            if language == Language.SPARQL:
                 def execute(self):
                     result = self.graph.query(query)
                     for row in result:
                         self.graph.add(row)
 
-            elif language == self.CLASSES.update.toPython():
+            elif language == Language.UPDATE:
                 def execute(self):
                     processUpdate(self.graph, query,
                                   initNs=self.graph._namespaces_as_dict())
 
-            elif language == self.CLASSES.execute.toPython():
+            elif language == Language.EXECUTE:
                 def execute(self):
                     construct = query.replace("EXECUTE", "CONSTRUCT")
                     result = self.graph.query(construct)
@@ -205,7 +209,7 @@ class RuleHandler(ConjunctiveGraph):
                             args[p.toPython()[
                                  p.rindex('/') + 1:]] = o.toPython()
                     getattr(self.graph.api, func_name)(**args)
-            elif language == self.CLASSES.executeBulk.toPython():
+            elif language == Language.EXECUTE_BULK:
                 def execute(self):
                     func_name = re.findall("EXECUTE?\((.*?)\)", query)[0]
                     select = re.sub("EXECUTE?\((.*?)\)", "SELECT", query)
@@ -433,3 +437,18 @@ class ResetFaceTrackRule(ReactiveRule):
 
     def action(self, triple_or_quad):
         self.graph.api.reset_face_tracking()
+
+
+class Language(Enum):
+    SPARQL = RuleHandler.CLASSES.sparql.toPython()
+    UPDATE = RuleHandler.CLASSES.update.toPython()
+    EXECUTE = RuleHandler.CLASSES.execute.toPython()
+    EXECUTE_BULK = RuleHandler.CLASSES.executeBulk.toPython()
+
+    @staticmethod
+    def convert(name):
+        module_logger.info("Converting {} to {}".format(name, Language[name]))
+        try:
+            return Language[name]
+        except KeyError:
+            raise ValueError("Unknown Name")

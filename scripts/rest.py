@@ -6,6 +6,8 @@ from flask_restful import Api, Resource, reqparse, marshal, abort
 from flask_restful import fields
 from flask_cors import CORS
 
+from rules import Language
+
 module_logger = logging.getLogger("mario.rest")
 
 
@@ -18,7 +20,7 @@ class RestApi:
 
         :type graph: scripts.rules.RuleHandler
         """
-        self.app = Flask("asdf", static_url_path="")
+        self.app = Flask("Mario", static_url_path="")
         self.api = Api(self.app)
         CORS(self.app)
         RestApi.graph = graph
@@ -44,6 +46,8 @@ class RestApi:
                               endpoint='functions')
         self.api.add_resource(self.NameSpacesResource, '/mario/namespaces',
                               endpoint='namespaces')
+        self.api.add_resource(self.VersionResource, '/mario/_version',
+                              endpoint='version')
 
     def run(self):
         self.process_in_bg = threading.Thread(target=self.app.run,
@@ -97,13 +101,10 @@ class RestApi:
         parser.add_argument('description', required=False, type=str,
                             default="No description available.",
                             location="json")
-        parser.add_argument('language', required=True, type=str,
-                            choices=(RestApi.graph.CLASSES.sparql.toPython(),
-                                     RestApi.graph.CLASSES.update.toPython(),
-                                     RestApi.graph.CLASSES.execute.toPython(),
-                                     RestApi.graph.CLASSES.executeBulk.toPython()),
-                            help="Only SPARQL and SPARQL Update "
-                                 "are allowed.")
+        parser.add_argument('language', required=True, type=Language.convert,
+                            choices=(x for x in Language),
+                            help="Only {} "
+                                 "are allowed.".format([x for x, y in Language.__members__.items()]))
         return parser.parse_args()
 
     @staticmethod
@@ -130,6 +131,7 @@ class RestApi:
 
         def post(self):
             args = RestApi.parse_rule()
+            RestApi.logger.info("Got new rule with arguments: " + str(args))
             result = RestApi.graph.save_and_create_rule(
                 args.name,
                 args.content,
@@ -188,6 +190,10 @@ class RestApi:
                 dict_row['URI'] = ns[1]
                 result.append(dict_row)
             return marshal(result, RestApi.namespace_fields)
+
+    class VersionResource(Resource):
+        def get(self):
+            return {'version': "1.0.0"}
 
 
 if __name__ == '__main__':

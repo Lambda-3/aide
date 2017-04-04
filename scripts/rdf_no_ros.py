@@ -49,7 +49,7 @@ def main():
         while running:
             try:
                 graph.execute_rules()
-                graph.pprint()
+                # graph.pprint()
                 time.sleep(3)
             except KeyboardInterrupt:
                 logger.info("Shutting down!")
