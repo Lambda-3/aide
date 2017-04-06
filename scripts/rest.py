@@ -32,7 +32,7 @@ class RestApi:
         # Adding resources
         self.api.add_resource(self.RulesResource, '/mario/rules',
                               endpoint='rules')
-        self.api.add_resource(self.RuleResource, '/mario/rule/<int:id>',
+        self.api.add_resource(self.RuleResource, '/mario/rules/<string:rule_name>',
                               endpoint='rule')
         self.api.add_resource(self.ClassesResource, '/mario/classes',
                               endpoint='classes')
@@ -82,14 +82,22 @@ class RestApi:
         'content': fields.String
     }
 
+    rule_fields_short = {
+        'name': fields.String,
+        'description': fields.String
+    }
+
     @staticmethod
     def rdflib_to_restful(result_set):
+        RestApi.logger.debug("processing " + str(result_set))
         result = []
         fields = result_set.vars
+        RestApi.logger.debug("bound vars: " + str(result_set.vars))
+
         for row in result_set:
             dict_row = dict()
             for i in range(len(row)):
-                dict_row[str(fields[i])] = row[i].toPython()
+                dict_row[str(fields[i])] = str(row[i])
             result.append(dict_row)
         if len(result) == 1:
             return result[0]
@@ -135,7 +143,7 @@ class RestApi:
     class RulesResource(Resource):
         def get(self):
             return marshal(RestApi.rdflib_to_restful(RestApi.graph.get_all_rules()),
-                           RestApi.rule_fields,
+                           RestApi.rule_fields_short,
                            envelope="rules")
 
         def post(self):
@@ -152,8 +160,11 @@ class RestApi:
             return result
 
     class RuleResource(Resource):
-        def get(self, id):
-            return True
+        def get(self, rule_name):
+            RestApi.logger.info("GET rule with name {}".format(rule_name))
+
+            return marshal(RestApi.rdflib_to_restful(RestApi.graph.get_rule(rule_name)),
+                           RestApi.rule_fields)
 
         def delete(self, id):
             return True

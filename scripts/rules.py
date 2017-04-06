@@ -53,6 +53,7 @@ class RuleHandler(ConjunctiveGraph):
         self._on_remove_functions = set()
         self._rules = []
         self.api = api
+        self.logger = logging.getLogger("mario.rules.RuleHandler")
 
         self._namespaces_as_dict = lambda: namespaces_as_dict(self)
 
@@ -156,7 +157,7 @@ class RuleHandler(ConjunctiveGraph):
             initBindings={"queried_name": self._uri_from_class(class_name)})
 
     def _uri_from_class(self, class_name):
-        return URIRef(Namespaces.functions + "" + class_name)
+        return URIRef(Namespaces.classes + "" + class_name)
 
     PPRINT_QUERY = prepareQuery("""
                 CONSTRUCT {?s ?p ?o} WHERE {?s ?p ?o.
@@ -179,18 +180,49 @@ class RuleHandler(ConjunctiveGraph):
         """, initNs=Namespaces.__dict__
     )
 
+    RULE_QUERY = prepareQuery(
+        """
+        SELECT ?name ?language ?content ?description WHERE {
+        ?s rdfs:label ?name.
+        ?s properties:content ?content.
+        ?s properties:inLanguage ?language.
+        ?s properties:description ?description.}
+        """, initNs=Namespaces.__dict__
+    )
+
     def get_all_rules(self):
         return self.query(self.ALL_RULES_QUERY)
 
+    def get_rule(self, rule_name):
+        self.logger.debug("Getting " + rule_name)
+        result = self.query(self.RULE_QUERY, initBindings={"name": Literal(rule_name)})
+        self.logger.debug("Result has {} rows.".format(len(result)))
+        return result
+
     def save_and_create_rule(self, name, query, language, description, type):
+        """
+
+        :type name: str
+        """
+        if re.search("\s", name) is not None:
+            raise ValueError("Name must not contain whitespaces!")
+
+        rule_node = Namespaces.rules[name]
+
+        if len(self.get_rule(name)) > 0:
+            # remove rule from rules list if there is one (actual python code)
+            self._rules.remove((a for a in self._rules if a.name == name).next())
+            # remove rule from graph (stored information about rule)
+            self.remove((rule_node, None, None))
+
         rule = self._create_periodic_rule_from_query(name, query, language)
         try:
             rule.execute()
         except ParseException:
             return False
 
-        self.graph._rules.append(rule)
-        rule_node = BNode()
+        self._rules.append(rule)
+
         self.add((rule_node, RDF.type, URIRef(type)))
         self.add((rule_node, RDFS.label, Literal(name)))
         self.add((rule_node, Namespaces.properties.inLanguage, URIRef(language.value)))
@@ -231,8 +263,7 @@ class RuleHandler(ConjunctiveGraph):
                         if p == Namespaces.functions.func:
                             func_name = o.toPython()
                         else:
-                            args[p.toPython()[
-                                 p.rindex('/') + 1:]] = o.toPython()
+                            args[p.toPython()[p.rindex('/') + 1:]] = o.toPython()
                     getattr(self.graph.api, func_name)(**args)
             elif language == Language.EXECUTE_BULK:
                 def execute(self):
