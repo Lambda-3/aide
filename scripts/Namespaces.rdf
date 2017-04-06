@@ -1,0 +1,8 @@
+@prefix mario: <http://prokyon:5000/mario/>.
+@prefix classes: <http://prokyon:5000/mario/classes/>.
+@prefix properties: <http://prokyon:5000/mario/properties/>.
+@prefix functions: <http://prokyon:5000/mario/functions/>.
+@prefix rules: <http://prokyon:5000/mario/rules/>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.

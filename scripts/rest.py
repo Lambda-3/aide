@@ -6,7 +6,7 @@ from flask_restful import Api, Resource, reqparse, marshal, abort
 from flask_restful import fields
 from flask_cors import CORS
 
-from rules import Language
+from rules import Language, Namespaces
 
 module_logger = logging.getLogger("mario.rest")
 
@@ -59,7 +59,7 @@ class RestApi:
         self.app.run(debug=True)
 
     rdf_class_fields = {
-        'URI': fields.String(attribute="class_name"),
+        'URI': fields.String(attribute="queried_name"),
         'label': fields.String(attribute="class_label")
     }
 
@@ -73,6 +73,13 @@ class RestApi:
     namespace_fields = {
         'URI': fields.String,
         'namespace': fields.String
+    }
+
+    rule_fields = {
+        'name': fields.String,
+        'description': fields.String,
+        'language': fields.String,
+        'content': fields.String
     }
 
     @staticmethod
@@ -127,7 +134,9 @@ class RestApi:
 
     class RulesResource(Resource):
         def get(self):
-            return True
+            return marshal(RestApi.rdflib_to_restful(RestApi.graph.get_all_rules()),
+                           RestApi.rule_fields,
+                           envelope="rules")
 
         def post(self):
             args = RestApi.parse_rule()
@@ -137,7 +146,7 @@ class RestApi:
                 args.content,
                 args.language,
                 args.description,
-                type=RestApi.graph.CLASSES.periodicRule)
+                type=Namespaces.classes.periodicRule)
             if not result:
                 abort(400, message="Query could not be parsed!")
             return result
