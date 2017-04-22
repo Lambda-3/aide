@@ -3,16 +3,16 @@
 import logging
 import time
 
-from rdf_constants import PATH, LOGPATH
+from config import RDF_PATH, LOGGING_PATH
 from rest import RestApi
 from rules import RuleHandler
 
 logger = logging.getLogger("mario")
 logger.setLevel(logging.DEBUG)
-fh = logging.FileHandler(LOGPATH)
+fh = logging.FileHandler(LOGGING_PATH)
 fh.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
+ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter("%(asctime)s - %(name)s %(levelname)s - %("
                               "message)s")
 fh.setFormatter(formatter)
@@ -37,9 +37,8 @@ class FakeApi:
 
 def main():
     logger.info("Creating a RuleHandler with a FakeApi.")
-    with RuleHandler(PATH, FakeApi()) as graph:
+    with RuleHandler(RDF_PATH, FakeApi(), "simpleOnthology.rdf") as graph:
         logger.info("Parsing graph...")
-        graph.parse("simpleOnthology.rdf", format="turtle")
         logger.info("graph parsed.")
         graph.add_cleanup_function(lambda: graph.remove((None, None, None)))
 
@@ -48,8 +47,6 @@ def main():
         running = True
         while running:
             try:
-                logger.info("graph parsed.")
-
                 graph.execute_rules()
                 graph.pprint()
                 time.sleep(3)

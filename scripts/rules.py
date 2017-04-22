@@ -1,9 +1,11 @@
+import logging
 import math
 import os
 import re
 from abc import ABCMeta, abstractproperty, abstractmethod
 
 import scipy.spatial
+from enum import Enum
 from pyparsing import ParseException
 from rdflib.graph import ConjunctiveGraph
 from rdflib.namespace import RDF, Namespace, RDFS
@@ -13,6 +15,25 @@ from rdflib.term import Literal, URIRef, BNode
 
 from rdf_constants import BOOLEAN, FACE, SKEL_TRACKER, TYPES
 from rdf_constants import id_from_face
+from config import NAMESPACES_PATH, NAMESPACES_FORMAT
+
+module_logger = logging.getLogger("mario.rules")
+
+
+def _get_init_namespaces():
+    g = ConjunctiveGraph()
+    g.parse(NAMESPACES_PATH, format=NAMESPACES_FORMAT)
+    return namespaces_as_dict(g)
+
+
+def namespaces_as_dict(g):
+    result = {}
+    for row in g.namespaces():
+        result[str(row[0])] = Namespace(row[1])
+    return result
+
+
+Namespaces = type('Namespaces', (unicode,), _get_init_namespaces())
 
 
 class RuleHandler(ConjunctiveGraph):
@@ -21,15 +42,20 @@ class RuleHandler(ConjunctiveGraph):
     operate on the RDF graph.
     """
 
-    def __init__(self, path, api):
+    def __init__(self, path, api, initial_onthology=None, format="turtle"):
         super(RuleHandler, self).__init__('Sleepycat')
         self.graph = self
         self.open(path, create=(not os.path.isdir(path)))
+        if initial_onthology:
+            self.parse(initial_onthology, format=format)
         self._cleanup_functions = set()
         self._on_add_functions = set()
         self._on_remove_functions = set()
         self._rules = []
         self.api = api
+        self.logger = logging.getLogger("mario.rules.RuleHandler")
+
+        self._namespaces_as_dict = lambda: namespaces_as_dict(self)
 
     def __enter__(self):
         return self
@@ -38,27 +64,27 @@ class RuleHandler(ConjunctiveGraph):
         self._cleanup()
         self.graph.close()
 
-    def add_cleanup_function(self, function):
-        self._cleanup_functions.add(function)
+    def add_cleanup_function(self, func):
+        self._cleanup_functions.add(func)
 
     def _cleanup(self):
-        for function in self._cleanup_functions:
-            function()
+        for func in self._cleanup_functions:
+            func()
 
-    def add_on_add_listener(self, function):
-        self._on_add_functions.add(function)
+    def add_on_add_listener(self, func):
+        self._on_add_functions.add(func)
 
-    def add_on_remove_listener(self, function):
-        self._on_add_functions.add(function)
+    def add_on_remove_listener(self, func):
+        self._on_add_functions.add(func)
 
     def add(self, triple_or_quad):
-        for function in self._on_add_functions:
-            function(triple_or_quad)
+        for func in self._on_add_functions:
+            func(triple_or_quad)
         super(RuleHandler, self).add(triple_or_quad)
 
     def remove(self, triple_or_quad):
-        for function in self._on_remove_functions:
-            function(triple_or_quad)
+        for func in self._on_remove_functions:
+            func(triple_or_quad)
         super(RuleHandler, self).remove(triple_or_quad)
 
     def load_all_rules(self):
@@ -93,10 +119,6 @@ class RuleHandler(ConjunctiveGraph):
         """
         for rule in self._rules:
             print(rule.name)
-
-    CLASSES = Namespace("http://prokyon:5000/mario/classes/")
-    PROPERTIES = Namespace("http://prokyon:5000/mario/properties/")
-    FUNCTIONS = Namespace("http://prokyon:5000/mario/functions/")
 
     ALL_CLASSES_QUERY = prepareQuery(
         """SELECT ?class_name ?class_label WHERE {
@@ -135,7 +157,7 @@ class RuleHandler(ConjunctiveGraph):
             initBindings={"queried_name": self._uri_from_class(class_name)})
 
     def _uri_from_class(self, class_name):
-        return URIRef(self.CLASSES + "" + class_name)
+        return URIRef(Namespaces.classes + "" + class_name)
 
     PPRINT_QUERY = prepareQuery("""
                 CONSTRUCT {?s ?p ?o} WHERE {?s ?p ?o.
@@ -147,28 +169,67 @@ class RuleHandler(ConjunctiveGraph):
         res.graph.namespace_manager = self.namespace_manager
         print(res.graph.serialize(format="n3"))
 
+    ALL_RULES_QUERY = prepareQuery(
+        """
+        SELECT ?name ?description ?language ?content WHERE {
+        ?s a classes:periodicRule.
+        ?s rdfs:label ?name.
+        ?s properties:inLanguage ?language.
+        ?s properties:content ?content.
+        ?s properties:description ?description.}
+        """, initNs=Namespaces.__dict__
+    )
+
+    RULE_QUERY = prepareQuery(
+        """
+        SELECT ?name ?language ?content ?description WHERE {
+        ?s rdfs:label ?name.
+        ?s properties:content ?content.
+        ?s properties:inLanguage ?language.
+        ?s properties:description ?description.}
+        """, initNs=Namespaces.__dict__
+    )
+
+    def get_all_rules(self):
+        return self.query(self.ALL_RULES_QUERY)
+
+    def get_rule(self, rule_name):
+        self.logger.debug("Getting " + rule_name)
+        result = self.query(self.RULE_QUERY, initBindings={"name": Literal(rule_name)})
+        self.logger.debug("Result has {} rows.".format(len(result)))
+        return result
+
     def save_and_create_rule(self, name, query, language, description, type):
+        """
+
+        :type name: str
+        """
+        if re.search("\s", name) is not None:
+            raise ValueError("Name must not contain whitespaces!")
+
+        rule_node = Namespaces.rules[name]
+
+        if len(self.get_rule(name)) > 0:
+            # remove rule from rules list if there is one (actual python code)
+            self._rules.remove((a for a in self._rules if a.name == name).next())
+            # remove rule from graph (stored information about rule)
+            self.remove((rule_node, None, None))
+
         rule = self._create_periodic_rule_from_query(name, query, language)
         try:
             rule.execute()
         except ParseException:
             return False
 
-        self.graph._rules.append(rule)
-        rule_node = BNode()
+        self._rules.append(rule)
+
         self.add((rule_node, RDF.type, URIRef(type)))
         self.add((rule_node, RDFS.label, Literal(name)))
-        self.add((rule_node, self.PROPERTIES.inLanguage, URIRef(language)))
-        self.add((rule_node, self.PROPERTIES.content, Literal(query)))
-        self.add((rule_node, self.PROPERTIES.description, Literal(
+        self.add((rule_node, Namespaces.properties.inLanguage, URIRef(language.value)))
+        self.add((rule_node, Namespaces.properties.content, Literal(query)))
+        self.add((rule_node, Namespaces.properties.description, Literal(
             description)))
         return name
-
-    def _namespaces_as_dict(self):
-        dct = {}
-        for row in self.namespaces():
-            dct[str(row[0])] = row[1]
-        return dct
 
     def _create_periodic_rule_from_query(self, rule_name, query, language):
         """
@@ -181,31 +242,30 @@ class RuleHandler(ConjunctiveGraph):
 
         class GenericPeriodicRule(PeriodicRule):
             name = rule_name
-            if language == self.CLASSES.sparql.toPython():
+            if language == Language.SPARQL:
                 def execute(self):
                     result = self.graph.query(query)
                     for row in result:
                         self.graph.add(row)
 
-            elif language == self.CLASSES.update.toPython():
+            elif language == Language.UPDATE:
                 def execute(self):
                     processUpdate(self.graph, query,
                                   initNs=self.graph._namespaces_as_dict())
 
-            elif language == self.CLASSES.execute.toPython():
+            elif language == Language.EXECUTE:
                 def execute(self):
                     construct = query.replace("EXECUTE", "CONSTRUCT")
                     result = self.graph.query(construct)
                     func_name = ""
                     args = {}
                     for s, p, o in result:
-                        if p == self.graph.FUNCTIONS.func:
+                        if p == Namespaces.functions.func:
                             func_name = o.toPython()
                         else:
-                            args[p.toPython()[
-                                 p.rindex('/') + 1:]] = o.toPython()
+                            args[p.toPython()[p.rindex('/') + 1:]] = o.toPython()
                     getattr(self.graph.api, func_name)(**args)
-            elif language == self.CLASSES.executeBulk.toPython():
+            elif language == Language.EXECUTE_BULK:
                 def execute(self):
                     func_name = re.findall("EXECUTE?\((.*?)\)", query)[0]
                     select = re.sub("EXECUTE?\((.*?)\)", "SELECT", query)
@@ -409,8 +469,7 @@ class SampleGreeterRule(ReactiveRule):
 
     def condition(self, triple_or_quad):
         # Regard only tracking events
-        if not (triple_or_quad[1] == FACE.tracked and triple_or_quad[2]
-            == BOOLEAN.true):
+        if not (triple_or_quad[1] == FACE.tracked and triple_or_quad[2] == BOOLEAN.true):
             return False
         # Regard only tracking events that are new
         if (triple_or_quad) in self.graph:
@@ -433,3 +492,18 @@ class ResetFaceTrackRule(ReactiveRule):
 
     def action(self, triple_or_quad):
         self.graph.api.reset_face_tracking()
+
+
+class Language(Enum):
+    SPARQL = Namespaces.classes.sparql.toPython()
+    UPDATE = Namespaces.classes.update.toPython()
+    EXECUTE = Namespaces.classes.execute.toPython()
+    EXECUTE_BULK = Namespaces.classes.executeBulk.toPython()
+
+    @staticmethod
+    def convert(name):
+        module_logger.info("Converting {} to {}".format(name, Language[name]))
+        try:
+            return Language[name]
+        except KeyError:
+            raise ValueError("Unknown Name")
