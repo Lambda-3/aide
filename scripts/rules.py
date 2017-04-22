@@ -278,6 +278,9 @@ class RuleHandler(ConjunctiveGraph):
 
         return GenericPeriodicRule(self.graph)
 
+    def add_function(self, func_text):
+        return self.api.add_function(self.api.build_function(func_text))
+
 
 class PeriodicRule:
     """

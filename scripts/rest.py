@@ -129,6 +129,7 @@ class RestApi:
                             help="Class needs a name!")
         parser.add_argument('subClassOf', required=False, default=None,
                             type=str)
+        return parser.parse_args()
 
     @staticmethod
     def parse_property():
@@ -139,6 +140,14 @@ class RestApi:
                             help="Property needs a domain (class of subject)!")
         parser.add_argument('range', required=True, type=str,
                             help="Property needs a range (class of object)!")
+        return parser.parse_args()
+
+    @staticmethod
+    def parse_function():
+        parser = reqparse.RequestParser()
+        parser.add_argument('content', required=True, type=str,
+                            help="Need function content!")
+        return parser.parse_args()
 
     class RulesResource(Resource):
         def get(self):
@@ -199,6 +208,13 @@ class RestApi:
     class FunctionsResource(Resource):
         def get(self):
             return True
+
+        def post(self):
+            args = RestApi.parse_function()
+            result = RestApi.graph.add_function(args.content)
+            if not result:
+                abort(400, message="Function definition is wrong!")
+            return result
 
     class NameSpacesResource(Resource):
         def get(self):

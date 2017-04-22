@@ -2,8 +2,9 @@
 
 import logging
 import time
+import re
 
-from config import RDF_PATH, LOGGING_PATH
+from config import RDF_PATH, LOGGING_PATH, ONTHOLOGY_PATH
 from rest import RestApi
 from rules import RuleHandler
 
@@ -22,24 +23,39 @@ logger.addHandler(ch)
 
 
 class FakeApi:
+    def __init__(self):
+        self.logger = logging.getLogger("mario.rdf_no_ros.FakeApi")
+
     def __getattr__(self, name):
-        def dummy_func(*args, **kwargs):
-            print("Fake-Invoking function {}:".format(name))
-            if args:
-                print("Arguments: " + str(args))
-            if kwargs:
-                print("Keyword Arguments: " + str(kwargs))
+        if not self.__dict__[name]:
+            def dummy_func(*args, **kwargs):
+                logger.info("Fake-Invoking function {}:".format(name))
+                if args:
+                    logger.info("Arguments: " + str(args))
+                if kwargs:
+                    logger.info("Keyword Arguments: " + str(kwargs))
 
-        self.__dict__[name] = dummy_func
+            self.__dict__[name] = dummy_func
 
-        return dummy_func
+        return self.__dict__[name]
+
+    def add_function(self, function):
+        logger.info("Adding function with name {}".format(function.__name__))
+        self.__dict__[function.__name__] = function
+        return function.__name__
+
+    @staticmethod
+    def build_function(function_text):
+        name = re.findall("def (\w+)", function_text)[0]
+        logger.info("Building function with name {}".format(name))
+        # !!! IN NO WAY IS THIS SECURE !!!
+        exec (function_text)
+        return locals()[name]
 
 
 def main():
     logger.info("Creating a RuleHandler with a FakeApi.")
-    with RuleHandler(RDF_PATH, FakeApi(), "simpleOnthology.rdf") as graph:
-        logger.info("Parsing graph...")
-        logger.info("graph parsed.")
+    with RuleHandler(RDF_PATH, FakeApi(), ONTHOLOGY_PATH) as graph:
         graph.add_cleanup_function(lambda: graph.remove((None, None, None)))
 
         api = RestApi(graph)
