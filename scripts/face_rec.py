@@ -11,15 +11,18 @@ import roslib
 import rospy
 import sensor_msgs.point_cloud2 as pc
 from cv_bridge import CvBridge, CvBridgeError
-from mario.srv import TrackFace
+from geometry_msgs.msg import Point
+from mario.srv import TrackFace, ResetTrackFace
 from sensor_msgs.msg import Image
 from sensor_msgs.msg._PointCloud2 import PointCloud2
 from sklearn.mixture import GMM
 
-np.set_printoptions(precision=2)
-roslib.load_manifest('mario')
+# hack at time being
+if __name__ == "__main__":
+    np.set_printoptions(precision=2)
+    roslib.load_manifest('mario')
 
-pc.read_points(None)
+    pc.read_points(None)
 
 
 class ServiceHandler:
@@ -28,9 +31,10 @@ class ServiceHandler:
     """
     IMAGE_CHANNEL = "/camera/rgb/image_raw"
     SERVICE_CHANNEL = 'mario/face_rec/track_face'
+    RESET_CHANNEL = 'mario/face_rec/reset'
     CLOUD_CHANNEL = "/camera/depth_registered/points"
 
-    def __init__(self):
+    def __init__(self, face_tracker):
 
         self.img_subscriber = rospy.Subscriber(ServiceHandler.IMAGE_CHANNEL,
                                                Image,
@@ -40,6 +44,14 @@ class ServiceHandler:
                                                  PointCloud2,
                                                  callback=self.set_cloud,
                                                  queue_size=1)
+
+        self.face_tracker = face_tracker
+
+        self.sync_lock = threading.Lock()
+
+        # register the reset service
+        rospy.Service(ServiceHandler.RESET_CHANNEL, ResetTrackFace,
+                      self.reset)
 
     def set_img(self, img):
         self._image = img
@@ -77,6 +89,26 @@ class ServiceHandler:
     cloud = property(get_cloud, set_cloud)
 
     @staticmethod
+    def call_reset_service():
+        try:
+            reset = rospy.ServiceProxy(ServiceHandler.RESET_CHANNEL,
+                                       ResetTrackFace)
+            reset()
+        except rospy.ServiceException:
+            pass
+
+    def reset(self, request):
+        with self.sync_lock:
+            remove_face = rospy.ServiceProxy(
+                ServiceHandler.SERVICE_CHANNEL,
+                TrackFace)
+            for face in self.face_tracker.faces:
+                if not face.is_unknown():
+                    id = face.label
+                    remove_face(id, False, None)
+            self.face_tracker.faces = set()
+
+    @staticmethod
     def get_service(callback):
         """
         Factory method that provides the ros service which is to be used by the
@@ -105,11 +137,11 @@ class ServiceHandler:
             for face in faces:
                 if not face.is_unknown():
                     id = face.label
-                    add_face(id, True, face.x, face.y, face.z)
+                    add_face(id, True, Point(face.x, face.y, face.z))
         except rospy.ServiceException:
             pass
 
-    def call_service_async(self, faces):
+    def call_service_async(self):
         """
         Same as above, asynchronous.
 
@@ -117,7 +149,16 @@ class ServiceHandler:
         :type faces: set
         :param faces: Set of tracked faces to be updated in the rdf graph.
         """
-        threading.Thread(target=self.call_service, args=(faces,)).start()
+        threading.Thread(target=self.call_service,
+                         args=(self.face_tracker.faces,)).start()
+
+    def step(self):
+        with self.sync_lock:
+            image = self.image
+            cloud = self.cloud
+            self.face_tracker.process_image(image)
+            set_faces_3d_coordinates(cloud, self.face_tracker.faces)
+        self.call_service_async()
 
 
 class Face:
@@ -162,7 +203,7 @@ class Face:
 
 
 class FaceTracker:
-    confidence_level = 0.59
+    confidence_level = 0.50
     channel = "/mario/img"
     # Openface & dlib constants for the location of the models
     openface_dir = "/opt/openface"
@@ -322,15 +363,11 @@ def set_faces_3d_coordinates(cloud, faces):
 
 
 def main():
-    rospy.init_node('face_rec', anonymous=True)
-    srv_handler = ServiceHandler()
-    tracker = FaceTracker()
+    rospy.init_node('face_rec')
+    tracker = FaceTracker(visualize=True)
+    srv_handler = ServiceHandler(tracker)
     while not rospy.is_shutdown():
-        image = srv_handler.image
-        cloud = srv_handler.cloud
-        tracker.process_image(image)
-        set_faces_3d_coordinates(cloud, tracker.faces)
-        srv_handler.call_service_async(tracker.faces)
+        srv_handler.step()
         rospy.Rate(8).sleep()
     rospy.spin()
 

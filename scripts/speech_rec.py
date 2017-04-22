@@ -5,9 +5,12 @@ import roslib
 import rospy
 import speech_recognition as sr
 from mario.srv import AddSpeech
+from rt_audio_ros.msg import AudioStream
+from speech_recognition import AudioSource
 
-roslib.load_manifest('mario')
-r = sr.Recognizer()
+if __name__ == "__main__":
+    roslib.load_manifest('mario')
+    r = sr.Recognizer()
 
 
 class ServiceHandler:
@@ -54,8 +57,6 @@ def main():
             # r.adjust_for_ambient_noise(source)
             audio = r.listen(source)
             print("Understood, processing")
-            # process_audio(audio)
-
             process_in_bg = threading.Thread(target=process_audio,
                                              args=(audio,))
             process_in_bg.start()
@@ -74,6 +75,8 @@ def process_audio(audio):
         # to use another API key, use `r.recognize_google(audio,
         # key="GOOGLE_SPEECH_RECOGNITION_API_KEY")`
         # instead of `r.recognize_google(audio)`
+        time = rospy.Time.now()
+        print time
         s = r.recognize_google(audio)
         ServiceHandler.call_service(s)
     except sr.UnknownValueError:
@@ -83,6 +86,31 @@ def process_audio(audio):
             "Could not request results from Google Speech Recognition "
             "service; {0}".format(
                 e))
+
+
+class FakeSource(AudioSource):
+    def __init__(self):
+        self.stream = self
+        rospy.Subscriber("/manyears_node/stream",
+                         AudioStream,
+                         callback=self.store,
+                         queue_size=1)
+        rospy.sleep(5)
+        self.CHUNK = 1024
+        self.SAMPLE_RATE = 48000
+        self.SAMPLE_WIDTH = 2
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass
+
+    def store(self, data):
+        self.data = data
+
+    def read(self, size):
+        return self.data.data[:2048]
 
 
 if __name__ == '__main__':
