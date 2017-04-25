@@ -77,15 +77,6 @@ class ServiceHandler:
         return []
 
     def cleanup_services(self):
-        self.graph.remove((None, SKEL_TRACKER.position_x, None))
-        self.graph.remove((None, SKEL_TRACKER.position_y, None))
-        self.graph.remove((None, SKEL_TRACKER.position_z, None))
-        self.graph.remove((None, SKEL_TRACKER.tracked, None))
-        self.graph.remove((None, FACE.tracked, None))
-        self.graph.remove((None, FACE.position_x, None))
-        self.graph.remove((None, FACE.position_y, None))
-        self.graph.remove((None, FACE.position_z, None))
-        self.graph.remove((None, TYPES.speech, None))
         self.graph.remove((None, None, None))
 
 
@@ -96,11 +87,9 @@ def main():
         service_handler = ServiceHandler(graph)
         service_handler.initialize_all_services()
 
-
         api = RestApi(graph)
         api.run()
         while not rospy.is_shutdown():
-            # print graph.graph.serialize(format="turtle")
             graph.execute_rules()
             graph.pprint()
             rospy.sleep(3)
