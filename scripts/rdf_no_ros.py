@@ -39,10 +39,10 @@ class FakeApi:
 
         return self.__dict__[name]
 
-    def add_function(self, function):
-        logger.info("Adding function with name {}".format(function.__name__))
-        self.__dict__[function.__name__] = function
-        return function.__name__
+    def add_function(self, funct):
+        logger.info("Adding function with name {}".format(funct.__name__))
+        self.__dict__[funct.__name__] = funct.__get__(self, type(self))
+        return funct.__name__
 
     @staticmethod
     def build_function(function_text):

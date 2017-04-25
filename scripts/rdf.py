@@ -96,11 +96,6 @@ def main():
         service_handler = ServiceHandler(graph)
         service_handler.initialize_all_services()
 
-        graph._create_periodic_rule_from_query("execute_rule",
-                                               """EXECUTE {[] functions:func
-                                               "say"; functions:text
-                                               'hello'} WHERE {}""",
-                                               language=graph.CLASSES.execute.toPython()).execute()
 
         api = RestApi(graph)
         api.run()
