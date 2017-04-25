@@ -2,18 +2,22 @@
 
 import roslib
 import rospy
-from rdflib import Literal, BNode
+from mario.msg._RdfTriple import RdfTriple
+from rdflib.plugins.sparql.processor import prepareQuery
 
-import action_api
+roslib.load_manifest('mario')
+
 import face_rec
 import speech_rec
+import config
+
+from rdflib import Literal, BNode
+from rdf_no_ros import FakeApi
 from rdf_constants import (PATH, FACE, TYPES, SKEL_TRACKER, BOOLEAN)
 from rdf_constants import (face_from_id, skeleton_from_id)
 from rest import RestApi
 from rules import RuleHandler
 from skeleton_rec import ServiceHandler as SkeletonHandler
-
-roslib.load_manifest('mario')
 
 
 class ServiceHandler:
@@ -88,27 +92,38 @@ class ServiceHandler:
         self.graph.remove((None, TYPES.speech, None))
         self.graph.remove((None, None, None))
 
+    def herp(self, derp):
+        """
 
-def main():
-    rospy.init_node("rdf_handler")
-    with RuleHandler(PATH, action_api) as graph:
-        graph.parse("simpleOnthology.rdf", format="turtle")
-        service_handler = ServiceHandler(graph)
-        service_handler.initialize_all_services()
+        :param derp:
+        :type derp: mario.msg._RdfTriple.RdfTriple
+        :return:
+        """
 
-        graph._create_periodic_rule_from_query("execute_rule",
-                                               """EXECUTE {[] functions:func
-                                               "say"; functions:text
-                                               'hello'} WHERE {}""",
-                                               language=graph.CLASSES.execute.toPython()).execute()
 
-        api = RestApi(graph)
-        api.run()
-        while not rospy.is_shutdown():
-            # print graph.graph.serialize(format="turtle")
-            graph.execute_rules()
-            graph.pprint()
-            rospy.sleep(3)
+class Environment:
+    def create_triple_from_msg(msg):
+        """
+
+        :type msg: RdfTriple
+        """
+
+    def main(self):
+        rospy.init_node("rdf_handler")
+
+        with RuleHandler(config.RDF_PATH, FakeApi, config.ONTHOLOGY_PATH) as graph:
+            self.graph = graph
+            rospy.Subscriber("/mario/rdf", RdfTriple, self.create_triple_from_msg)
+            # service_handler = ServiceHandler(graph)
+            # service_handler.initialize_all_services()
+
+            # api = RestApi(graph)
+            # api.run()
+            while not rospy.is_shutdown():
+                # print graph.graph.serialize(format="turtle")
+                graph.execute_rules()
+                graph.pprint()
+                rospy.sleep(3)
 
 
 if __name__ == "__main__":
