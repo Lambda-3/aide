@@ -48,6 +48,9 @@ add_message_files(
   FILES
   Person.msg
   Skeleton.msg
+  RdfTriple.msg
+  Function.msg
+  Rule.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -57,6 +60,12 @@ add_service_files(
   ResetTrackFace.srv
   TrackFace.srv
   TrackSkeleton.srv
+  AddFunction.srv
+  AddRule.srv
+  GetAllFunctions.srv
+  GetAllRules.srv
+  GetFunction.srv
+  GetRule.srv
 
 )
 

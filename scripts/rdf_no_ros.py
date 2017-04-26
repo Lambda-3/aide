@@ -4,6 +4,7 @@ import logging
 import time
 import re
 
+from components import Environment
 from config import RDF_PATH, LOGGING_PATH, ONTHOLOGY_PATH
 from rest import RestApi
 from rules import RuleHandler
@@ -39,10 +40,10 @@ class FakeApi:
 
         return self.__dict__[name]
 
-    def add_function(self, function):
-        logger.info("Adding function with name {}".format(function.__name__))
-        self.__dict__[function.__name__] = function
-        return function.__name__
+    def add_function(self, funct):
+        logger.info("Adding function with name {}".format(funct.__name__))
+        self.__dict__[funct.__name__] = funct.__get__(self, type(self))
+        return funct.__name__
 
     @staticmethod
     def build_function(function_text):
@@ -53,23 +54,24 @@ class FakeApi:
         return locals()[name]
 
 
-def main():
-    logger.info("Creating a RuleHandler with a FakeApi.")
-    with RuleHandler(RDF_PATH, FakeApi(), ONTHOLOGY_PATH) as graph:
-        graph.add_cleanup_function(lambda: graph.remove((None, None, None)))
+class NoRosEnvironment(Environment):
+    def spin(self):
+        logger.info("Creating a RuleHandler with a FakeApi.")
+        with RuleHandler(RDF_PATH, FakeApi(), ONTHOLOGY_PATH) as graph:
+            graph.add_cleanup_function(lambda: graph.remove((None, None, None)))
 
-        api = RestApi(graph)
-        api.run()
-        running = True
-        while running:
-            try:
-                graph.execute_rules()
-                graph.pprint()
-                time.sleep(3)
-            except KeyboardInterrupt:
-                logger.info("Shutting down!")
-                running = False
+            api = RestApi(graph)
+            api.run()
+            running = True
+            while running:
+                try:
+                    graph.execute_rules()
+                    graph.pprint()
+                    time.sleep(3)
+                except KeyboardInterrupt:
+                    logger.info("Shutting down!")
+                    running = False
 
 
 if __name__ == "__main__":
-    main()
+    NoRosEnvironment().spin()

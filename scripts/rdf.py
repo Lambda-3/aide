@@ -3,7 +3,6 @@
 import roslib
 import rospy
 from mario.msg._RdfTriple import RdfTriple
-from rdflib.plugins.sparql.processor import prepareQuery
 
 roslib.load_manifest('mario')
 
@@ -52,7 +51,6 @@ class ServiceHandler:
                 req.skeleton.head_position.y)))
             self.graph.set((skeleton, SKEL_TRACKER.position_z,
                             Literal(-req.skeleton.head_position.z)))
-            print "added"
         else:
             self.graph.remove((None, None, skeleton))
             self.graph.remove((skeleton, None, None))
@@ -92,38 +90,42 @@ class ServiceHandler:
         self.graph.remove((None, TYPES.speech, None))
         self.graph.remove((None, None, None))
 
-    def herp(self, derp):
-        """
 
-        :param derp:
-        :type derp: mario.msg._RdfTriple.RdfTriple
-        :return:
-        """
+class SimpleCEPAndKB:
+    def __init__(self, kb):
+        self.graph = kb
+        rospy.Subscriber("/mario/rdf", RdfTriple, self.create_triple_from_msg)
 
-
-class Environment:
-    def create_triple_from_msg(msg):
+    def create_triple_from_msg(self, msg):
         """
 
         :type msg: RdfTriple
         """
+        result = self.graph.query(
+            """CONSTRUCT {{ {} {} {} }} WHERE {{ }}""".format(msg.subject, msg.predicate, msg.object))
 
-    def main(self):
-        rospy.init_node("rdf_handler")
+        for row in result:
+            self.graph.set(row)
 
-        with RuleHandler(config.RDF_PATH, FakeApi, config.ONTHOLOGY_PATH) as graph:
-            self.graph = graph
-            rospy.Subscriber("/mario/rdf", RdfTriple, self.create_triple_from_msg)
-            # service_handler = ServiceHandler(graph)
-            # service_handler.initialize_all_services()
+    def spin(self):
+        # service_handler = ServiceHandler(graph)
+        # service_handler.initialize_all_services()
 
-            # api = RestApi(graph)
-            # api.run()
-            while not rospy.is_shutdown():
-                # print graph.graph.serialize(format="turtle")
-                graph.execute_rules()
-                graph.pprint()
-                rospy.sleep(3)
+        # api = RestApi(graph)
+        # api.run()
+        while not rospy.is_shutdown():
+            # print graph.graph.serialize(format="turtle")
+            self.graph.execute_rules()
+            self.graph.pprint()
+            rospy.sleep(3)
+
+
+def main():
+    rospy.init_node("rdf_handler")
+    with RuleHandler(config.RDF_PATH, FakeApi, config.ONTHOLOGY_PATH) as cep_and_kb:
+        cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove((None, None, None)))
+        cep = SimpleCEPAndKB(cep_and_kb)
+        cep.spin()
 
 
 if __name__ == "__main__":
