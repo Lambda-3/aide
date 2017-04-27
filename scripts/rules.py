@@ -42,7 +42,7 @@ class RuleHandler(ConjunctiveGraph):
     operate on the RDF graph.
     """
 
-    def __init__(self, path, api, initial_onthology=None, format="turtle"):
+    def __init__(self, path, api=None, initial_onthology=None, format="turtle"):
         super(RuleHandler, self).__init__('Sleepycat')
         self.graph = self
         self.open(path, create=(not os.path.isdir(path)))
@@ -171,10 +171,9 @@ class RuleHandler(ConjunctiveGraph):
 
     ALL_RULES_QUERY = prepareQuery(
         """
-        SELECT ?name ?description ?language ?content WHERE {
-        ?s a classes:periodicRule.
+        SELECT ?name ?description ?content WHERE {
+        ?s a classes:rule.
         ?s rdfs:label ?name.
-        ?s properties:inLanguage ?language.
         ?s properties:content ?content.
         ?s properties:description ?description.}
         """, initNs=Namespaces.__dict__
@@ -182,10 +181,9 @@ class RuleHandler(ConjunctiveGraph):
 
     RULE_QUERY = prepareQuery(
         """
-        SELECT ?name ?language ?content ?description WHERE {
+        SELECT ?name ?content ?description WHERE {
         ?s rdfs:label ?name.
         ?s properties:content ?content.
-        ?s properties:inLanguage ?language.
         ?s properties:description ?description.}
         """, initNs=Namespaces.__dict__
     )
@@ -196,10 +194,13 @@ class RuleHandler(ConjunctiveGraph):
     def get_rule(self, rule_name):
         self.logger.debug("Getting " + rule_name)
         result = self.query(self.RULE_QUERY, initBindings={"name": Literal(rule_name)})
-        self.logger.debug("Result has {} rows.".format(len(result)))
+        size = len(result)
+        self.logger.debug("Result has {} rows.".format(size))
+        if size > 1:
+            raise RuntimeError("Got two rules with same name. Something somewhere went terribly wrong.")
         return result
 
-    def save_and_create_rule(self, name, query, language, description, type):
+    def save_and_create_rule(self, name, description, query):
         """
 
         :type name: str
@@ -215,6 +216,8 @@ class RuleHandler(ConjunctiveGraph):
             # remove rule from graph (stored information about rule)
             self.remove((rule_node, None, None))
 
+        language = Language.lang_from_content(query)
+
         rule = self._create_periodic_rule_from_query(name, query, language)
         try:
             rule.execute()
@@ -223,18 +226,16 @@ class RuleHandler(ConjunctiveGraph):
 
         self._rules.append(rule)
 
-        self.add((rule_node, RDF.type, URIRef(type)))
         self.add((rule_node, RDFS.label, Literal(name)))
-        self.add((rule_node, Namespaces.properties.inLanguage, URIRef(language.value)))
+        self.add((rule_node, RDF.type, Namespaces.classes.rule))
         self.add((rule_node, Namespaces.properties.content, Literal(query)))
-        self.add((rule_node, Namespaces.properties.description, Literal(
-            description)))
-        return name
+        self.add((rule_node, Namespaces.properties.description, Literal(description)))
+        return True
 
     def _create_periodic_rule_from_query(self, rule_name, query, language):
         """
 
-        :type language: str
+        :type language: Language
         :type query: str
         :type rule_name: str
         """
@@ -510,3 +511,7 @@ class Language(Enum):
             return Language[name]
         except KeyError:
             raise ValueError("Unknown Name")
+
+    @staticmethod
+    def lang_from_content(content):
+        return Language.EXECUTE_BULK if content.startswith("EXECUTE") else Language.SPARQL

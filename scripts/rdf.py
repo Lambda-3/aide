@@ -2,130 +2,91 @@
 
 import roslib
 import rospy
-from mario.msg._RdfTriple import RdfTriple
+from mario.srv._GetAllRules import GetAllRulesResponse
 
 roslib.load_manifest('mario')
 
-import face_rec
-import speech_rec
 import config
 
-from rdflib import Literal, BNode
-from rdf_no_ros import FakeApi
-from rdf_constants import (PATH, FACE, TYPES, SKEL_TRACKER, BOOLEAN)
-from rdf_constants import (face_from_id, skeleton_from_id)
-from rest import RestApi
+from rospy import loginfo, logdebug
+from ros_services import get_service_handler
+from mario.srv import GetRuleResponse
+from mario.msg import RdfTriple
 from rules import RuleHandler
-from skeleton_rec import ServiceHandler as SkeletonHandler
+
+from rospy_message_converter.message_converter import convert_dictionary_to_ros_message as dtr
 
 
-class ServiceHandler:
-    def __init__(self, graph):
-        """
+def rdflib_to_dict(result_set):
+    loginfo("processing " + str(result_set))
+    result = []
+    fields = result_set.vars
+    loginfo("bound vars: " + str(result_set.vars))
 
-        :type graph: RdfGraph
-        """
-        self.graph = graph
-
-    def initialize_all_services(self):
-        # Add face recognition/tracking service
-        face_rec.ServiceHandler.get_service(self.track_face)
-        # Add speech recognition service
-        speech_rec.ServiceHandler.get_service(self.add_speech)
-        # Add Skeleton tracking service
-        SkeletonHandler.get_service(self.track_skeleton)
-
-        self.graph.add_cleanup_function(self.cleanup_services)
-
-    def track_skeleton(self, req):
-        """
-
-        :type req: mario.srv._TrackSkeleton.TrackSkeletonRequest
-        """
-        skeleton = skeleton_from_id(req.skeleton.id)
-        if req.is_tracked:
-            self.graph.add((skeleton, SKEL_TRACKER.tracked, BOOLEAN.true))
-            self.graph.set((skeleton, SKEL_TRACKER.position_x, Literal(
-                req.skeleton.head_position.x)))
-            self.graph.set((skeleton, SKEL_TRACKER.position_y, Literal(
-                req.skeleton.head_position.y)))
-            self.graph.set((skeleton, SKEL_TRACKER.position_z,
-                            Literal(-req.skeleton.head_position.z)))
-        else:
-            self.graph.remove((None, None, skeleton))
-            self.graph.remove((skeleton, None, None))
-
-    def add_speech(self, req):
-        """
-
-        :type req: mario.srv._AddSpeech.AddSpeechRequest
-        """
-        self.graph.add((BNode(), TYPES.speech, Literal(req.sentence)))
-
-    def track_face(self, req):
-        """
-        :type req: mario.srv._TrackFace.TrackFaceRequest
-
-        """
-        face = face_from_id(req.face_id)
-        if req.is_tracked:
-            self.graph.add((face, FACE.tracked, BOOLEAN.true))
-            self.graph.set((face, FACE.position_x, Literal(req.position.x)))
-            self.graph.set((face, FACE.position_y, Literal(req.position.y)))
-            self.graph.set((face, FACE.position_z, Literal(req.position.z)))
-
-        else:
-            self.graph.remove((face, None, None))
-        return []
-
-    def cleanup_services(self):
-        self.graph.remove((None, SKEL_TRACKER.position_x, None))
-        self.graph.remove((None, SKEL_TRACKER.position_y, None))
-        self.graph.remove((None, SKEL_TRACKER.position_z, None))
-        self.graph.remove((None, SKEL_TRACKER.tracked, None))
-        self.graph.remove((None, FACE.tracked, None))
-        self.graph.remove((None, FACE.position_x, None))
-        self.graph.remove((None, FACE.position_y, None))
-        self.graph.remove((None, FACE.position_z, None))
-        self.graph.remove((None, TYPES.speech, None))
-        self.graph.remove((None, None, None))
-
-
-class SimpleCEPAndKB:
-    def __init__(self, kb):
-        self.graph = kb
-        rospy.Subscriber("/mario/rdf", RdfTriple, self.create_triple_from_msg)
-
-    def create_triple_from_msg(self, msg):
-        """
-
-        :type msg: RdfTriple
-        """
-        result = self.graph.query(
-            """CONSTRUCT {{ {} {} {} }} WHERE {{ }}""".format(msg.subject, msg.predicate, msg.object))
-
-        for row in result:
-            self.graph.set(row)
-
-    def spin(self):
-        # service_handler = ServiceHandler(graph)
-        # service_handler.initialize_all_services()
-
-        # api = RestApi(graph)
-        # api.run()
-        while not rospy.is_shutdown():
-            # print graph.graph.serialize(format="turtle")
-            self.graph.execute_rules()
-            self.graph.pprint()
-            rospy.sleep(3)
+    for row in result_set:
+        dict_row = dict()
+        for i in range(len(row)):
+            dict_row[str(fields[i])] = str(row[i])
+        result.append(dict_row)
+    if len(result) == 1:
+        return result[0]
+    else:
+        return result
 
 
 def main():
     rospy.init_node("rdf_handler")
-    with RuleHandler(config.RDF_PATH, FakeApi, config.ONTHOLOGY_PATH) as cep_and_kb:
-        cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove((None, None, None)))
-        cep = SimpleCEPAndKB(cep_and_kb)
-        cep.spin()
+    with RuleHandler(config.RDF_PATH, initial_onthology=config.ONTHOLOGY_PATH) as cep_and_kb:
+        # delete everything to not pollute the graph
+        # cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove((None, None, None)))
+
+        def create_triple_from_msg(msg):
+            """
+
+            :type msg: RdfTriple
+            """
+            result = cep_and_kb.query(
+                """CONSTRUCT {{ {} {} {} }} WHERE {{ }}""".format(msg.subject, msg.predicate, msg.object))
+
+            for row in result:
+                cep_and_kb.set(row)
+
+        rospy.Subscriber("/mario/rdf", RdfTriple, create_triple_from_msg)
+
+        get_service_handler("AddRule").register_service(
+            lambda req: cep_and_kb.save_and_create_rule(req.rule.name,
+                                                        req.rule.description,
+                                                        req.rule.content))
+
+        def get_rule(req):
+            result = cep_and_kb.get_rule(req.name)
+            loginfo("Got Result {}".format(result))
+            if result:
+                return GetRuleResponse(dtr("mario/Rule", rdflib_to_dict(result)))
+            else:
+                return None
+
+        get_service_handler("GetRule").register_service(get_rule)
+
+        def get_all_rules(req):
+            result = cep_and_kb.get_all_rules()
+            loginfo("Got {} rules".format(len(result)))
+            rule_list = []
+            dict_result = rdflib_to_dict(result)
+            if len(result) == 1:
+                return GetAllRulesResponse([dtr("mario/Rule", dict_result)])
+            for row in dict_result:
+                loginfo("Appending {}".format(row))
+                rule_list.append(dtr("mario/Rule", row))
+            loginfo(type(rule_list))
+            return GetAllRulesResponse(rules=rule_list)
+
+        get_service_handler("GetAllRules").register_service(get_all_rules)
+        while not rospy.is_shutdown():
+            print len(cep_and_kb.get_all_rules())
+            cep_and_kb.execute_rules()
+            cep_and_kb.pprint()
+            rospy.sleep(3)
 
 
 if __name__ == "__main__":

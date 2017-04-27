@@ -11,7 +11,7 @@ from flask_cors import CORS
 from flask_restful import Api, fields, reqparse, Resource, abort, marshal
 from enum import Enum
 
-from mario.msg import Function
+from mario.msg import Function, Rule
 from ros_services import get_service_handler
 
 rdf_class_fields = {
@@ -40,7 +40,7 @@ def save_rule(name, description, content):
 
 def get_rule(name):
     get = get_service_handler('GetRule').get_service()
-    return get()
+    return get(name)
 
 
 def get_all_rules():
@@ -48,23 +48,29 @@ def get_all_rules():
     return get()
 
 
-rule_fields = {
-    'name': fields.String,
-    'description': fields.String,
-    'language': fields.String,
-    'content': fields.String
-}
-
 rule_fields_short = {
     'name': fields.String,
     'description': fields.String
 }
 
 
+def parse_rule():
+    parser = reqparse.RequestParser()
+    parser.add_argument('name', required=True, type=str,
+                        help="Rule needs a name!",
+                        location="json")
+    parser.add_argument('content', required=True, type=str,
+                        help="Rule needs content!",
+                        location="json")
+    parser.add_argument('description', required=False, type=str,
+                        default="No description available.",
+                        location="json")
+    return parser.parse_args()
+
+
 # Functions
 def save_function(name, doc, content):
-    add = get_service_handler('AddFunction').get_service()
-    return add(Function(name, doc, content)).success
+    return get_service_handler('AddFunction').get_service()(Function(name, doc, content)).success
 
 
 def get_function(name):
@@ -76,13 +82,6 @@ def get_all_functions():
     # get = get_service_handler('GetAllFunctions').get_service()
     # return get()
     return []
-
-
-function_fields = {
-    'name': fields.String,
-    'doc': fields.String,
-    'content': fields.String
-}
 
 
 def parse_function():
@@ -97,17 +96,42 @@ def parse_function():
 
 
 class ResourceEnum(Enum):
-    Functions = {"post": save_function,
-                 "get": get_all_functions,
+    Functions = {"post": lambda **args: get_service_handler('AddFunction').get_service()(Function(**args)).success,
                  "marshal_with": None,
                  "envelope": None,
                  "validate_input": parse_function,
                  }
 
-    Function = {"get": get_function,
-                "marshal_with": function_fields,
+    Function = {"get": lambda **args: get_service_handler('GetFunction').get_service()(**args).function,
+                "marshal_with": {
+                    'name': fields.String,
+                    'doc': fields.String,
+                    'content': fields.String
+                },
                 "path": ("/mario/functions/<string:name>",)
                 }
+    Rules = {
+        "post": lambda **args: get_service_handler('AddRule').get_service()(Rule(**args)).success,
+        "get": lambda: get_service_handler('GetAllRules').get_service()().rules,
+        "marshal_with": {
+            'name': fields.String,
+            'description': fields.String
+        },
+        "envelope": "rules",
+        "validate_input": parse_rule,
+    }
+    Ruless = {}
+
+    Rule = {
+        "get": lambda **args: get_service_handler('GetRule').get_service()(**args).rule,
+        "marshal_with": {
+            'name': fields.String,
+            'description': fields.String,
+            'content': fields.String
+        },
+        "envelope": "rule",
+        "path": ("/mario/rules/<string:name>",)
+    }
 
     def validate_input(self):
         return self.value['validate_input']()
