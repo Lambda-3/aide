@@ -2,7 +2,9 @@
 import roslib
 import tf
 
+
 roslib.load_manifest('mario')
+
 import rospy
 import threading
 from mario.msg import Skeleton

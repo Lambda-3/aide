@@ -5,7 +5,6 @@ import roslib
 import rospy
 import speech_recognition as sr
 from mario.srv import AddSpeech
-from rt_audio_ros.msg import AudioStream
 from speech_recognition import AudioSource
 
 if __name__ == "__main__":
@@ -86,31 +85,6 @@ def process_audio(audio):
             "Could not request results from Google Speech Recognition "
             "service; {0}".format(
                 e))
-
-
-class FakeSource(AudioSource):
-    def __init__(self):
-        self.stream = self
-        rospy.Subscriber("/manyears_node/stream",
-                         AudioStream,
-                         callback=self.store,
-                         queue_size=1)
-        rospy.sleep(5)
-        self.CHUNK = 1024
-        self.SAMPLE_RATE = 48000
-        self.SAMPLE_WIDTH = 2
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        pass
-
-    def store(self, data):
-        self.data = data
-
-    def read(self, size):
-        return self.data.data[:2048]
 
 
 if __name__ == '__main__':

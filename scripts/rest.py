@@ -96,20 +96,22 @@ def parse_function():
 
 
 class ResourceEnum(Enum):
-    Functions = {"post": lambda **args: get_service_handler('AddFunction').get_service()(Function(**args)).success,
-                 "marshal_with": None,
-                 "envelope": None,
-                 "validate_input": parse_function,
-                 }
+    Functions = {
+        "post": lambda **args: get_service_handler('AddFunction').get_service()(Function(**args)).success,
+        "marshal_with": None,
+        "envelope": None,
+        "validate_input": parse_function,
+    }
 
-    Function = {"get": lambda **args: get_service_handler('GetFunction').get_service()(**args).function,
-                "marshal_with": {
-                    'name': fields.String,
-                    'doc': fields.String,
-                    'content': fields.String
-                },
-                "path": ("/mario/functions/<string:name>",)
-                }
+    Function = {
+        "get": lambda **args: get_service_handler('GetFunction').get_service()(**args).function,
+        "marshal_with": {
+            'name': fields.String,
+            'doc': fields.String,
+            'content': fields.String
+        },
+        "path": "/mario/functions/<string:name>"
+    }
     Rules = {
         "post": lambda **args: get_service_handler('AddRule').get_service()(Rule(**args)).success,
         "get": lambda: get_service_handler('GetAllRules').get_service()().rules,
@@ -120,7 +122,13 @@ class ResourceEnum(Enum):
         "envelope": "rules",
         "validate_input": parse_rule,
     }
-    Ruless = {}
+
+    Version = {
+        "get": lambda: {"version": '"Alluring Alliteration"'},
+        "marshal_with": None,
+        "envelope": None,
+        "path": "/mario/_version"
+    }
 
     Rule = {
         "get": lambda **args: get_service_handler('GetRule').get_service()(**args).rule,
@@ -130,7 +138,7 @@ class ResourceEnum(Enum):
             'content': fields.String
         },
         "envelope": "rule",
-        "path": ("/mario/rules/<string:name>",)
+        "path": "/mario/rules/<string:name>"
     }
 
     def validate_input(self):
@@ -150,7 +158,9 @@ class ResourceEnum(Enum):
 
     def path(self):
         if self.value.has_key("path"):
-            return self.value["path"]
+            path = self.value["path"]
+            # if path is a tuple just return it, if not add a trailing slash if there is none.
+            return path if isinstance(path, tuple) else (path, path + "/") if not path.endswith("/") else (path,)
         else:
             name = self.name.lower()
             return ("/mario/{}".format(name), "/mario/{}/".format(name))
@@ -217,7 +227,14 @@ def build_resources(api):
                 try:
                     result = rsc.get(*args, **kwargs)
                     if result:
-                        return marshal(result, rsc.marshal_with(), rsc.envelope())
+                        try:
+                            return marshal(result, rsc.marshal_with(), rsc.envelope())
+                        except AttributeError as e:
+                            if "'NoneType' object has no attribute 'items'" in e.message:
+                                return result
+                            else:
+                                raise AttributeError(e)
+
 
                 except rospy.ServiceException as e:
                     if e.message.endswith("None"):

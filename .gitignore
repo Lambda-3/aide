@@ -1,3 +1,5 @@
 *.txt
 *.pyc
 .idea
+.rdf/
+log

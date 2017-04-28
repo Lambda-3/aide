@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import json
 
 import roslib
 import rospy
@@ -34,11 +35,17 @@ def rdflib_to_dict(result_set):
         return result
 
 
+class ROSStub:
+    def call(self, name, **kwargs):
+        loginfo("Calling function {} with kwargs: ".format(name, json.dumps(kwargs)))
+        get_service_handler("CallFunction").get_service()(name, json.dumps(kwargs))
+
+
 def main():
     rospy.init_node("rdf_handler")
-    with RuleHandler(config.RDF_PATH, initial_onthology=config.ONTHOLOGY_PATH) as cep_and_kb:
+    with RuleHandler(config.RDF_PATH, api=ROSStub(), initial_onthology=config.ONTHOLOGY_PATH) as cep_and_kb:
         # delete everything to not pollute the graph
-        # cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove((None, None, None)))
+        cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove((None, None, None)))
 
         def create_triple_from_msg(msg):
             """

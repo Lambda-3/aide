@@ -137,7 +137,7 @@ class ServiceHandler:
             for face in faces:
                 if not face.is_unknown():
                     id = face.label
-                    add_face(id, True, Point(face.x, face.y, face.z))
+                    # add_face(id, True, Point(face.x, face.y, face.z))
         except rospy.ServiceException:
             pass
 
@@ -352,10 +352,12 @@ def set_faces_3d_coordinates(cloud, faces):
     faces_list = list(faces)
     for face in faces_list:
         center = face.get_position().center()
+        print type(center.x)
         uvs.append((center.x, center.y))
 
     points_of_interest = list(pc.read_points(cloud, uvs=uvs,
-                                             field_names="x, y, z"))
+                                             field_names="x, y, z",
+                                             skip_nans=True))
 
     for i in range(0, len(faces_list)):
         face = faces_list[i]

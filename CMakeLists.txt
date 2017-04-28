@@ -56,16 +56,17 @@ add_message_files(
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
-  AddSpeech.srv
-  ResetTrackFace.srv
-  TrackFace.srv
-  TrackSkeleton.srv
   AddFunction.srv
   AddRule.srv
+  AddSpeech.srv
+  CallFunction.srv
   GetAllFunctions.srv
   GetAllRules.srv
   GetFunction.srv
   GetRule.srv
+  ResetTrackFace.srv
+  TrackFace.srv
+  TrackSkeleton.srv
 
 )
 

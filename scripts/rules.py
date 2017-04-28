@@ -272,8 +272,11 @@ class RuleHandler(ConjunctiveGraph):
                     select = re.sub("EXECUTE?\((.*?)\)", "SELECT", query)
                     result = self.graph.query(select)
                     for row in result:
-                        getattr(self.graph.api, func_name)(*(x.toPython() for x
-                                                             in row))
+                        print(row)
+                        row_as_dict = row.asdict()
+                        print(row_as_dict)
+                        print {x: str(row_as_dict[x]) for x in row_as_dict}
+                        self.graph.api.call(func_name, **{x: row_as_dict[x].toPython() for x in row_as_dict})
             else:
                 raise ValueError("Unknown Language!")
 

@@ -1,18 +1,16 @@
 #!/usr/bin/env python
-
+import json
 import re
 import rospy
 import roslib
 import pymongo
 from mario.msg import Function
-from mario.srv._GetFunction import GetFunctionResponse
+from mario.srv import GetFunctionResponse
 
 roslib.load_manifest("mario")
 
 from ros_services import get_service_handler
-from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as rtd
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message as dtr
-from rospy_message_converter.json_message_converter import convert_json_to_ros_message as jtr
 
 from rospy import loginfo
 
@@ -57,7 +55,10 @@ class SimpleApi:
         return locals()[name]
 
     def add_from_text(self, name, doc, content, new=True, **kwargs):
-        success = self.add_function(self.build_function(content))
+        built_function = self.build_function(content)
+        if not built_function.__name__ == name:
+            raise ValueError("Given name and name from definition are different!")
+        success = self.add_function(built_function)
         if success and new:
             self.store(name, doc, content)
         return success
@@ -76,12 +77,21 @@ class SimpleApi:
         result = self.functions_table.find_one({"name": name})
         return result
 
+    def call(self, name, **kwargs):
+        try:
+            getattr(self, name)(**kwargs)
+        except KeyError as e:
+            raise ValueError("There is no function with such name!")
+
 
 def main():
     rospy.init_node("functions")
     api = SimpleApi()
     get_service_handler("AddFunction").register_service(
         lambda req: api.add_from_text(req.function.name, req.function.doc, req.function.content))
+
+    get_service_handler("CallFunction").register_service(
+        lambda req: api.call(req.name, **json.loads(req.kwargs)) or ())
 
     def get_function(req):
         result = api.get(req.name)
@@ -92,6 +102,7 @@ def main():
             return None
 
     get_service_handler("GetFunction").register_service(get_function)
+
     rospy.spin()
 
 
