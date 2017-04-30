@@ -1,3 +1,4 @@
 string name
 string doc
-string content
+string[] args
+string body

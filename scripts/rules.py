@@ -198,7 +198,7 @@ class RuleHandler(ConjunctiveGraph):
         self.logger.debug("Result has {} rows.".format(size))
         if size > 1:
             raise RuntimeError("Got two rules with same name. Something somewhere went terribly wrong.")
-        return result
+        return None if not result else next(result.__iter__())
 
     def save_and_create_rule(self, name, description, query):
         """
@@ -210,7 +210,7 @@ class RuleHandler(ConjunctiveGraph):
 
         rule_node = Namespaces.rules[name]
 
-        if len(self.get_rule(name)) > 0:
+        if self.get_rule(name):
             # remove rule from rules list if there is one (actual python code)
             self._rules.remove((a for a in self._rules if a.name == name).next())
             # remove rule from graph (stored information about rule)
@@ -283,7 +283,7 @@ class RuleHandler(ConjunctiveGraph):
         return GenericPeriodicRule(self.graph)
 
     def add_function(self, func_text):
-        return self.api.add_function(self.api.build_function(func_text))
+        return self.api.add_function(self.api.assemble_function(func_text))
 
 
 class PeriodicRule:
@@ -398,7 +398,7 @@ class SkeletonLinker(PeriodicRule):
         FILTER NOT EXISTS {?face_id skeleton:skeleton ?id}
         }
         """,
-        initNs={"faces": FACE, "boolean": BOOLEAN,
+        initNs={"faces"   : FACE, "boolean": BOOLEAN,
                 "skeleton": SKEL_TRACKER})
 
     unlinked_skeletons_query = prepareQuery(
@@ -411,7 +411,7 @@ class SkeletonLinker(PeriodicRule):
         FILTER NOT EXISTS {?face_id skeleton:skeleton ?skel_id}
         }
         """
-        , initNs={"faces": FACE, "boolean": BOOLEAN,
+        , initNs={"faces"   : FACE, "boolean": BOOLEAN,
                   "skeleton": SKEL_TRACKER})
 
     def near(self, position1, position2):

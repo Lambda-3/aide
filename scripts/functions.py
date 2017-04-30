@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 import json
-import re
+
+import requests
 import rospy
 import roslib
 import pymongo
-from mario.msg import Function
-from mario.srv import GetFunctionResponse
+from mario.srv import AddFunction, CallFunction, GetFunction, GetAllFunctions, GetSemRelatedFunctions
 
 roslib.load_manifest("mario")
 
 from ros_services import get_service_handler
-from rospy_message_converter.message_converter import convert_dictionary_to_ros_message as dtr
+from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as rtd
 
 from rospy import loginfo
 
@@ -37,44 +37,53 @@ class SimpleApi:
 
     def add_function(self, funct):
         rospy.loginfo("Adding function with name {}".format(funct.__name__))
-        try:
-            self.__dict__[funct.__name__]
+        if self.__dict__.has_key(funct.__name__):
             raise ValueError("Function already exists!")
-        except KeyError:
+        else:
             pass
 
         self.__dict__[funct.__name__] = funct.__get__(self, type(self))
         return True
 
     @staticmethod
-    def build_function(function_text):
-        name = re.findall("def (\w+)", function_text)[0]
-        rospy.loginfo("Building function with name {}".format(name))
-        # !!! IN NO WAY IS THIS SECURE !!!
-        exec (function_text)
-        return locals()[name]
+    def assemble_function(name, args, body):
+        function_text = "def " + name + "(self," + ",".join(args) + "):"
+        function_text += "\n  " + "\n  ".join(body.splitlines())
 
-    def add_from_text(self, name, doc, content, new=True, **kwargs):
-        built_function = self.build_function(content)
-        if not built_function.__name__ == name:
-            raise ValueError("Given name and name from definition are different!")
-        success = self.add_function(built_function)
+        rospy.loginfo("Assembled function with name {}".format(name))
+
+        return function_text
+
+    @staticmethod
+    def build_function(function_text):
+        exec (function_text)
+        locals().pop("function_text")
+        return locals().popitem()[1]
+
+    def add_from_text(self, name, doc, body, args, new=True):
+        if name in ("function_text", "locals"):
+            raise ValueError("Nice Try!")
+        function_text = self.assemble_function(name, args, body)
+        built_func = self.build_function(function_text)
+        # !!! IN NO WAY IS THIS SECURE !!!
+        success = self.add_function(built_func)
         if success and new:
-            self.store(name, doc, content)
+            self.store(name, doc, args, function_text)
         return success
 
-    def store(self, name, doc, content):
-        self.functions_table.insert_one({"name": name, "doc": doc, "content": content})
+    def store(self, name, doc, args, function_text):
+        self.functions_table.insert_one({"name": name, "doc": doc, "args": args, "body": function_text})
 
     def load(self, name):
-        return self.functions_table.find_one({"name": name})
+        return self.functions_table.find_one({"name": name}, {"_id": False})
 
     def load_all(self):
-        for row in self.functions_table.find():
-            self.add_from_text(new=False, **row)
+        for row in self.functions_table.find({}, {"_id": False}):
+            func = self.build_function(row["body"])
+            self.add_function(func)
 
     def get(self, name):
-        result = self.functions_table.find_one({"name": name})
+        result = self.functions_table.find_one({"name": name}, {"_id": False})
         return result
 
     def call(self, name, **kwargs):
@@ -83,25 +92,56 @@ class SimpleApi:
         except KeyError as e:
             raise ValueError("There is no function with such name!")
 
+    def get_all_functions(self):
+        """
+
+        :rtype: generator
+        """
+        return self.functions_table.find({}, {"_id": False})
+
+    def get_best_matches(self, name, top_k):
+
+        """
+
+        :rtype: list
+        """
+        # build pairs from given name and every func in database
+        pairs = [{"t1": name.replace("_", " "), "t2": row['name'].replace("_", " ")} for row in
+                 self.functions_table.find({}, {"name": True, "_id": False})]
+
+        data = {'corpus': 'wiki-2014',
+                'model': 'W2V',
+                'language': 'EN',
+                'scoreFunction': 'COSINE', 'pairs': pairs}
+
+        headers = {
+            'content-type': "application/json"
+        }
+
+        response = requests.request("POST", "http://localhost:8916/relatedness", data=json.dumps(data), headers=headers)
+
+        response.raise_for_status()
+
+        response = response.json()['pairs']
+
+        index = top_k if len(response) > top_k else len(response)
+
+        return [self.get(rsp['t2'].replace(" ", "_")) for rsp in sorted(response, reverse=True)][:index]
+
 
 def main():
     rospy.init_node("functions")
     api = SimpleApi()
-    get_service_handler("AddFunction").register_service(
-        lambda req: api.add_from_text(req.function.name, req.function.doc, req.function.content))
 
-    get_service_handler("CallFunction").register_service(
-        lambda req: api.call(req.name, **json.loads(req.kwargs)) or ())
+    get_service_handler(AddFunction).register_service(lambda function: api.add_from_text(**rtd(function)))
 
-    def get_function(req):
-        result = api.get(req.name)
-        try:
-            del result['_id']
-            return GetFunctionResponse(function=dtr("mario/Function", result))
-        except:
-            return None
+    get_service_handler(CallFunction).register_service(lambda name, kwargs: api.call(name, **json.loads(kwargs)))
 
-    get_service_handler("GetFunction").register_service(get_function)
+    get_service_handler(GetFunction).register_service(api.get)
+
+    get_service_handler(GetAllFunctions).register_service(lambda: [x for x in api.get_all_functions()])
+
+    get_service_handler(GetSemRelatedFunctions).register_service(api.get_best_matches)
 
     rospy.spin()
 

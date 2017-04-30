@@ -1,3 +1,3 @@
 string name
-string kwargs
+string kwargs # Keyword Arguments, encoded as a json string
 ---

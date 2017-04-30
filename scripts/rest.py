@@ -1,7 +1,9 @@
 #!/usr/bin/env python
+import json
 import threading
 import roslib
 import rospy
+from mario.srv import GetSemRelatedFunctions, AddFunction, GetAllFunctions, GetFunction, AddRule, GetAllRules, GetRule
 
 roslib.load_manifest("mario")
 
@@ -15,19 +17,19 @@ from mario.msg import Function, Rule
 from ros_services import get_service_handler
 
 rdf_class_fields = {
-    'URI': fields.String(attribute="queried_name"),
+    'URI'  : fields.String(attribute="queried_name"),
     'label': fields.String(attribute="class_label")
 }
 
 rdf_property_fields = {
-    'URI': fields.String(attribute="name"),
-    'label': fields.String,
+    'URI'   : fields.String(attribute="name"),
+    'label' : fields.String,
     'domain': fields.String,
-    'range': fields.String
+    'range' : fields.String
 }
 
 namespace_fields = {
-    'URI': fields.String,
+    'URI'      : fields.String,
     'namespace': fields.String
 }
 
@@ -49,7 +51,7 @@ def get_all_rules():
 
 
 rule_fields_short = {
-    'name': fields.String,
+    'name'       : fields.String,
     'description': fields.String
 }
 
@@ -68,77 +70,79 @@ def parse_rule():
     return parser.parse_args()
 
 
-# Functions
-def save_function(name, doc, content):
-    return get_service_handler('AddFunction').get_service()(Function(name, doc, content)).success
-
-
-def get_function(name):
-    get = get_service_handler('GetFunction').get_service()
-    return get(name).function
-
-
-def get_all_functions():
-    # get = get_service_handler('GetAllFunctions').get_service()
-    # return get()
-    return []
-
-
 def parse_function():
+    def printit(*args, **kwargs):
+        print list(args)
+        return args
+
     parser = reqparse.RequestParser()
     parser.add_argument('name', required=True, type=str,
                         help="Function needs a name!")
     parser.add_argument('doc', required=False, type=str, default="",
                         help="Provide documentation to your function!")
-    parser.add_argument('content', required=True, type=str,
-                        help="Need function content!")
-    return parser.parse_args()
+    parser.add_argument('args', required=False, type=str, default="",
+                        help="Arguments for the function!", action='append')
+    parser.add_argument('body', required=True, type=str,
+                        help="Need function body!")
+    args = parser.parse_args()
+    loginfo(args.args)
+    return args
 
 
 class ResourceEnum(Enum):
+    Function = {
+        "get"         : lambda **args: get_service_handler(GetFunction).get_service()(**args).function,
+        "marshal_with": {
+            'name': fields.String,
+            'doc' : fields.String,
+            'args': fields.List(fields.String),
+            'body': fields.String,
+        },
+        "path"        : "/mario/functions/<string:name>"
+    }
+
     Functions = {
-        "post": lambda **args: get_service_handler('AddFunction').get_service()(Function(**args)).success,
-        "marshal_with": None,
-        "envelope": None,
+        "post"          : lambda **args: get_service_handler(AddFunction).get_service()(Function(**args)).success,
+        "get"           : lambda: get_service_handler(GetAllFunctions).get_service()().functions,
+        "marshal_with"  : Function["marshal_with"],
+        "envelope"      : "functions",
         "validate_input": parse_function,
     }
 
-    Function = {
-        "get": lambda **args: get_service_handler('GetFunction').get_service()(**args).function,
-        "marshal_with": {
-            'name': fields.String,
-            'doc': fields.String,
-            'content': fields.String
-        },
-        "path": "/mario/functions/<string:name>"
-    }
+    ReladedFunctions = {d: v for d, v in Functions.items() if d is not "post"}  # copy everything but post
+    ReladedFunctions['get'] = (lambda top_k=3, **args:
+                               get_service_handler(GetSemRelatedFunctions).get_service()
+                               (top_k=top_k, **args).functions)
+    ReladedFunctions['path'] = (
+        "/mario/functions/<string:name>/related/<int:top_k>", "/mario/functions/<string:name>/related/")
+
     Rules = {
-        "post": lambda **args: get_service_handler('AddRule').get_service()(Rule(**args)).success,
-        "get": lambda: get_service_handler('GetAllRules').get_service()().rules,
-        "marshal_with": {
-            'name': fields.String,
+        "post"          : lambda **args: get_service_handler(AddRule).get_service()(Rule(**args)).success,
+        "get"           : lambda: get_service_handler(GetAllRules).get_service()().rules,
+        "marshal_with"  : {
+            'name'       : fields.String,
             'description': fields.String
         },
-        "envelope": "rules",
+        "envelope"      : "rules",
         "validate_input": parse_rule,
     }
 
     Version = {
-        "get": lambda: {"version": '"Alluring Alliteration"'},
+        "get"         : lambda: {"version": '"Alluring Alliteration"'},
         "marshal_with": None,
-        "envelope": None,
-        "path": "/mario/_version"
+        "envelope"    : None,
+        "path"        : "/mario/_version"
     }
 
     Rule = {
-        "get": lambda **args: get_service_handler('GetRule').get_service()(**args).rule,
+        "get"         : lambda **args: get_service_handler(GetRule).get_service()(**args).rule,
         "marshal_with": {
-            'name': fields.String,
+            'name'       : fields.String,
             'description': fields.String,
-            'content': fields.String
+            'content'    : fields.String
         },
-        "envelope": "rule",
-        "path": "/mario/rules/<string:name>"
+        "envelope"    : "rule",
+        "path"        : "/mario/rules/<string:name>"
     }
 
     def validate_input(self):
@@ -157,11 +161,16 @@ class ResourceEnum(Enum):
         return self.value["post"](*args, **kwargs)
 
     def path(self):
+        """
+
+        :rtype: tuple
+        """
         if self.value.has_key("path"):
             path = self.value["path"]
-            # if path is a tuple just return it, if not add a trailing slash if there is none.
+            # if path is a tuple just return it, if not add a trailing slash if there is none and convert to tuple.
             return path if isinstance(path, tuple) else (path, path + "/") if not path.endswith("/") else (path,)
         else:
+            # if no path value is defined, create a default path
             name = self.name.lower()
             return ("/mario/{}".format(name), "/mario/{}/".format(name))
 
@@ -200,6 +209,7 @@ def build_resources(api):
                 :return: 
                 """
                 args = rsc.validate_input()
+                loginfo("POST request on {} with args {}".format(self.__class__, str(args)))
                 try:
                     result = rsc.post(**args)
                     loginfo("Success, Result: " + str(result))
@@ -225,19 +235,20 @@ def build_resources(api):
                 :return: 
                 """
                 try:
+                    loginfo("GET request on {} with args {}".format(self.__class__, str(kwargs)))
                     result = rsc.get(*args, **kwargs)
-                    if result:
+                    if result or result == []:
                         try:
                             return marshal(result, rsc.marshal_with(), rsc.envelope())
                         except AttributeError as e:
                             if "'NoneType' object has no attribute 'items'" in e.message:
+                                loginfo(e)
                                 return result
                             else:
                                 raise AttributeError(e)
-
-
                 except rospy.ServiceException as e:
                     if e.message.endswith("None"):
+                        loginfo(e)
                         abort(404)
                     error = e.message.split("error processing request: ")[1]
                     loginfo("Unsuccessful, got following error: " + error)

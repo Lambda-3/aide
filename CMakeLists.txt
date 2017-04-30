@@ -64,6 +64,7 @@ add_service_files(
   GetAllRules.srv
   GetFunction.srv
   GetRule.srv
+  GetSemRelatedFunctions.srv
   ResetTrackFace.srv
   TrackFace.srv
   TrackSkeleton.srv

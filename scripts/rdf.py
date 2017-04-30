@@ -3,7 +3,6 @@ import json
 
 import roslib
 import rospy
-from mario.srv._GetAllRules import GetAllRulesResponse
 
 roslib.load_manifest('mario')
 
@@ -11,34 +10,38 @@ import config
 
 from rospy import loginfo, logdebug
 from ros_services import get_service_handler
-from mario.srv import GetRuleResponse
+from mario.srv import GetAllRules, GetRule, AddRule, CallFunction
 from mario.msg import RdfTriple
 from rules import RuleHandler
 
-from rospy_message_converter.message_converter import convert_dictionary_to_ros_message as dtr
+
+def pythonize_row(row):
+    """
+    
+    :param row: Row to be converted to a dict.
+    :type row: rdflib.query.ResultRow
+    :return: 
+    :rtype: dict
+    """
+    return {k: v.toPython() for k, v in row.asdict().items()}
 
 
-def rdflib_to_dict(result_set):
-    loginfo("processing " + str(result_set))
-    result = []
-    fields = result_set.vars
-    loginfo("bound vars: " + str(result_set.vars))
-
-    for row in result_set:
-        dict_row = dict()
-        for i in range(len(row)):
-            dict_row[str(fields[i])] = str(row[i])
-        result.append(dict_row)
-    if len(result) == 1:
-        return result[0]
-    else:
-        return result
+def pythonize(result_set):
+    """
+    Converts a rdflib result set to a list of dicts which represent the rows of the result set.
+    
+    :param result_set: Result set to convert
+    :type result_set: rdflib.plugins.sparql.processor.SPARQLResult
+    :return: A list of dicts which represent the rows of a result
+    :rtype: list
+    """
+    return [pythonize_row(row) for row in result_set]
 
 
 class ROSStub:
     def call(self, name, **kwargs):
         loginfo("Calling function {} with kwargs: ".format(name, json.dumps(kwargs)))
-        get_service_handler("CallFunction").get_service()(name, json.dumps(kwargs))
+        get_service_handler(CallFunction).get_service()(name, json.dumps(kwargs))
 
 
 def main():
@@ -49,7 +52,8 @@ def main():
 
         def create_triple_from_msg(msg):
             """
-
+            Callback function to execute when a triple is published on the channel.
+            
             :type msg: RdfTriple
             """
             result = cep_and_kb.query(
@@ -60,37 +64,14 @@ def main():
 
         rospy.Subscriber("/mario/rdf", RdfTriple, create_triple_from_msg)
 
-        get_service_handler("AddRule").register_service(
-            lambda req: cep_and_kb.save_and_create_rule(req.rule.name,
-                                                        req.rule.description,
-                                                        req.rule.content))
+        get_service_handler(AddRule).register_service(
+            lambda rule: cep_and_kb.save_and_create_rule(rule.name, rule.description, rule.content))
 
-        def get_rule(req):
-            result = cep_and_kb.get_rule(req.name)
-            loginfo("Got Result {}".format(result))
-            if result:
-                return GetRuleResponse(dtr("mario/Rule", rdflib_to_dict(result)))
-            else:
-                return None
+        get_service_handler(GetRule).register_service(lambda name: pythonize_row(cep_and_kb.get_rule(name)))
 
-        get_service_handler("GetRule").register_service(get_rule)
+        get_service_handler(GetAllRules).register_service(lambda: pythonize(cep_and_kb.get_all_rules()))
 
-        def get_all_rules(req):
-            result = cep_and_kb.get_all_rules()
-            loginfo("Got {} rules".format(len(result)))
-            rule_list = []
-            dict_result = rdflib_to_dict(result)
-            if len(result) == 1:
-                return GetAllRulesResponse([dtr("mario/Rule", dict_result)])
-            for row in dict_result:
-                loginfo("Appending {}".format(row))
-                rule_list.append(dtr("mario/Rule", row))
-            loginfo(type(rule_list))
-            return GetAllRulesResponse(rules=rule_list)
-
-        get_service_handler("GetAllRules").register_service(get_all_rules)
         while not rospy.is_shutdown():
-            print len(cep_and_kb.get_all_rules())
             cep_and_kb.execute_rules()
             cep_and_kb.pprint()
             rospy.sleep(3)
