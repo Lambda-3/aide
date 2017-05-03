@@ -5,6 +5,8 @@ import requests
 import rospy
 import roslib
 import pymongo
+import action_api as ros
+
 from mario.srv import AddFunction, CallFunction, GetFunction, GetAllFunctions, GetSemRelatedFunctions
 
 roslib.load_manifest("mario")
@@ -86,9 +88,9 @@ class SimpleApi:
         result = self.functions_table.find_one({"name": name}, {"_id": False})
         return result
 
-    def call(self, name, **kwargs):
+    def call(self, func_name, **kwargs):
         try:
-            getattr(self, name)(**kwargs)
+            getattr(self, func_name)(**kwargs)
         except KeyError as e:
             raise ValueError("There is no function with such name!")
 
@@ -135,7 +137,8 @@ def main():
 
     get_service_handler(AddFunction).register_service(lambda function: api.add_from_text(**rtd(function)))
 
-    get_service_handler(CallFunction).register_service(lambda name, kwargs: api.call(name, **json.loads(kwargs)))
+    get_service_handler(CallFunction).register_service(lambda func_name, kwargs: api.call(func_name, **json.loads(
+        kwargs)))
 
     get_service_handler(GetFunction).register_service(api.get)
 

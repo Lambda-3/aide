@@ -5,9 +5,16 @@ VOICE = "voice_en1_mbrola"
 sound_handle = SoundClient(blocking=False)
 
 
-def say(text):
-    if text:
-        sound_handle.say(text, VOICE)
+class say:
+    sound_handle = None
+
+    def __init__(self, text):
+
+        try:
+            say.sound_handle.say(text)
+        except AttributeError:
+            say.sound_handle = SoundClient()
+            say.sound_handle.say(text)
 
 
 def reset_face_tracking():

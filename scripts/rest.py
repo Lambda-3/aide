@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import json
 import threading
 import roslib
 import rospy
@@ -7,7 +6,7 @@ from mario.srv import GetSemRelatedFunctions, AddFunction, GetAllFunctions, GetF
 
 roslib.load_manifest("mario")
 
-from rospy import loginfo, logdebug
+from rospy import loginfo
 from flask import Flask
 from flask_cors import CORS
 from flask_restful import Api, fields, reqparse, Resource, abort, marshal
@@ -33,23 +32,6 @@ namespace_fields = {
     'namespace': fields.String
 }
 
-
-# rules
-def save_rule(name, description, content):
-    add = get_service_handler('AddRule').get_service()
-    add(name, description, content)
-
-
-def get_rule(name):
-    get = get_service_handler('GetRule').get_service()
-    return get(name)
-
-
-def get_all_rules():
-    get = get_service_handler('GetAllRules').get_service()
-    return get()
-
-
 rule_fields_short = {
     'name'       : fields.String,
     'description': fields.String
@@ -71,10 +53,6 @@ def parse_rule():
 
 
 def parse_function():
-    def printit(*args, **kwargs):
-        print list(args)
-        return args
-
     parser = reqparse.RequestParser()
     parser.add_argument('name', required=True, type=str,
                         help="Function needs a name!")

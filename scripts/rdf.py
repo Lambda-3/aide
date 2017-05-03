@@ -39,9 +39,9 @@ def pythonize(result_set):
 
 
 class ROSStub:
-    def call(self, name, **kwargs):
-        loginfo("Calling function {} with kwargs: ".format(name, json.dumps(kwargs)))
-        get_service_handler(CallFunction).get_service()(name, json.dumps(kwargs))
+    def call(self, _func_name, **kwargs):
+        loginfo("Calling function {} with kwargs: ".format(_func_name, json.dumps(kwargs)))
+        get_service_handler(CallFunction).get_service()(_func_name, json.dumps(kwargs))
 
 
 def main():

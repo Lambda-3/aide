@@ -275,7 +275,8 @@ class RuleHandler(ConjunctiveGraph):
                         print(row)
                         row_as_dict = row.asdict()
                         print(row_as_dict)
-                        print {x: str(row_as_dict[x]) for x in row_as_dict}
+                        print {x: row_as_dict[x].toPython() for x in row_as_dict}
+
                         self.graph.api.call(func_name, **{x: row_as_dict[x].toPython() for x in row_as_dict})
             else:
                 raise ValueError("Unknown Language!")
