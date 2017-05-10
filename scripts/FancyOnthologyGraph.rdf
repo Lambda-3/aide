@@ -1,0 +1,61 @@
+@prefix classes: <http://prokyon:5000/mario/classes/> .
+@prefix functions: <http://prokyon:5000/mario/functions/> .
+@prefix mario: <http://prokyon:5000/mario/> .
+@prefix persons: <http://prokyon:5000/mario/persons/> .
+@prefix postures: <http://prokyon:5000/mario/postures/> .
+@prefix properties: <http://prokyon:5000/mario/properties/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rules: <http://prokyon:5000/mario/rules/> .
+@prefix skeletons: <http://prokyon:5000/mario/skeletons/> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+classes:person
+    rdfs:label "Person";
+    rdf:type rdf:Class.
+
+classes:posture
+    rdfs:label "Posture";
+    rdf:type rdf:Class.    
+
+postures:standing
+    rdfs:label "Posture";
+    rdf:type classes:posture.
+    
+postures:fell
+    rdfs:label "Posture";
+    rdf:type classes:posture.
+    
+postures:walking
+    rdfs:label "Posture";
+    rdf:type classes:posture.
+    
+classes:skeleton
+    rdfs:label "Skeleton";
+    rdf:type rdf:Class.
+
+properties:mobileNumber
+    rdf:type rdf:Property;
+    rdfs:label "mobile Number";
+    rdfs:domain classes:person;
+    rdfs:range xsd:string.
+
+properties:skeleton
+    rdf:type rdf:Property;
+    rdfs:label "skeleton";
+    rdfs:domain classes:person;
+    rdfs:range classes:skeleton.
+
+properties:posture
+    rdf:type rdf:Property;
+    rdfs:label "mobile Number";
+    rdfs:domain classes:skeleton;
+    rdfs:range classes:posture.
+    
+properties:iceContact
+    rdf:type rdf:Property;
+    rdfs:label "ICE contact";
+    rdfs:domain classes:person;
+    rdfs:range classes:person.
+

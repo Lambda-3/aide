@@ -109,8 +109,8 @@ class RuleHandler(ConjunctiveGraph):
         """
         Executes all loaded rules.
         """
-        for rule in self._rules:
-            print("Executing rule {}".format(rule.name))
+        for rule in [rl for rl in self._rules if not rl.executed]:
+            # print("Executing rule {}".format(rule.name))
             rule.execute()
 
     def print_rules(self):
@@ -207,7 +207,6 @@ class RuleHandler(ConjunctiveGraph):
         """
         if re.search("\s", name) is not None:
             raise ValueError("Name must not contain whitespaces!")
-
         rule_node = Namespaces.rules[name]
 
         if self.get_rule(name):
@@ -243,6 +242,12 @@ class RuleHandler(ConjunctiveGraph):
 
         class GenericPeriodicRule(PeriodicRule):
             name = rule_name
+
+            def __init__(self, graph):
+                super(GenericPeriodicRule, self).__init__(graph)
+                self.executed = False
+                self.name = rule_name
+
             if language == Language.SPARQL:
                 def execute(self):
                     result = self.graph.query(query)
@@ -268,16 +273,38 @@ class RuleHandler(ConjunctiveGraph):
                     getattr(self.graph.api, func_name)(**args)
             elif language == Language.EXECUTE_BULK:
                 def execute(self):
-                    func_name = re.findall("EXECUTE?\((.*?)\)", query)[0]
-                    select = re.sub("EXECUTE?\((.*?)\)", "SELECT", query)
-                    result = self.graph.query(select)
-                    for row in result:
-                        print(row)
-                        row_as_dict = row.asdict()
-                        print(row_as_dict)
-                        print {x: row_as_dict[x].toPython() for x in row_as_dict}
 
-                        self.graph.api.call(func_name, **{x: row_as_dict[x].toPython() for x in row_as_dict})
+                    # split query to header and where clause (condition)
+                    (header, where_clause) = query.split("WHERE")
+
+                    # find all function names to be executed
+                    func_names = re.findall("EXECUTE?\((.*?)\)", query)
+
+                    for func_name in func_names:
+
+                        # select = re.sub("EXECUTE?\((.*?)\)", "SELECT", query)
+                        args = [arg for arg in re.findall("{}?\)(.*?)[\n]".format(func_name), query)[0].split(" ") if
+                                arg]
+                        if not args:
+                            select = "SELECT ?dummy_arg WHERE {{ {} BIND(3 as ?dummy_arg) }}".format(where_clause)
+                        else:
+                            select = "SELECT {} WHERE {}".format(" ".join(args), where_clause)
+
+                        result = self.graph.query(select)
+
+                        for row in result:
+                            row_as_dict = row.asdict()
+
+                            print("Calling {}".format(func_name))
+                            if not args:
+                                print("with no args")
+                                func_args = {}
+                            else:
+                                func_args = {x: row_as_dict[x].toPython() for x in row_as_dict}
+                                print("with args: " + str(args))
+                            print("All Conditions true, executing rule" + self.name)
+                            self.graph.api.call(func_name, **func_args)
+                            self.executed = True
             else:
                 raise ValueError("Unknown Language!")
 

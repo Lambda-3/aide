@@ -3,6 +3,9 @@ import json
 
 import roslib
 import rospy
+from rdflib.term import URIRef
+
+from sparql_completer import QueryCompleter
 
 roslib.load_manifest('mario')
 
@@ -45,10 +48,18 @@ class ROSStub:
 
 
 def main():
-    rospy.init_node("rdf_handler")
+    rospy.init_node("rdf")
     with RuleHandler(config.RDF_PATH, api=ROSStub(), initial_onthology=config.ONTHOLOGY_PATH) as cep_and_kb:
         # delete everything to not pollute the graph
-        cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove((None, None, None)))
+        cep_and_kb.parse(config.SCRIPTS_PATH + "/BackgroundKnowledgeGraph.rdf", format="n3")
+        cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove((
+            URIRef("http://prokyon:5000/mario/rules/mrs_smith_fell"), None, None)))
+        cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove(
+            (None, None, URIRef("http://prokyon:5000/mario/fell"))))
+        cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove(
+            (None, None, None)))
+
+
 
         def create_triple_from_msg(msg):
             """
@@ -61,6 +72,7 @@ def main():
 
             for row in result:
                 cep_and_kb.set(row)
+                cep_and_kb.pprint()
 
         rospy.Subscriber("/mario/rdf", RdfTriple, create_triple_from_msg)
 
@@ -70,10 +82,9 @@ def main():
         get_service_handler(GetRule).register_service(lambda name: pythonize_row(cep_and_kb.get_rule(name)))
 
         get_service_handler(GetAllRules).register_service(lambda: pythonize(cep_and_kb.get_all_rules()))
-
+        cep_and_kb.pprint()
         while not rospy.is_shutdown():
             cep_and_kb.execute_rules()
-            cep_and_kb.pprint()
             rospy.sleep(3)
 
 

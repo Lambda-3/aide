@@ -23,6 +23,7 @@ class SimpleApi:
         self.db.functions.create_index("name", unique=True)
         self.functions_table = self.db.functions
         self.load_all()
+        self.ros = ros
 
     def __getattr__(self, name):
         if not self.__dict__[name]:
@@ -58,6 +59,7 @@ class SimpleApi:
 
     @staticmethod
     def build_function(function_text):
+        # !!! IN NO WAY IS THIS SECURE !!!
         exec (function_text)
         locals().pop("function_text")
         return locals().popitem()[1]
@@ -67,7 +69,7 @@ class SimpleApi:
             raise ValueError("Nice Try!")
         function_text = self.assemble_function(name, args, body)
         built_func = self.build_function(function_text)
-        # !!! IN NO WAY IS THIS SECURE !!!
+
         success = self.add_function(built_func)
         if success and new:
             self.store(name, doc, args, function_text)
@@ -111,9 +113,9 @@ class SimpleApi:
         pairs = [{"t1": name.replace("_", " "), "t2": row['name'].replace("_", " ")} for row in
                  self.functions_table.find({}, {"name": True, "_id": False})]
 
-        data = {'corpus': 'wiki-2014',
-                'model': 'W2V',
-                'language': 'EN',
+        data = {'corpus'       : 'wiki-2014',
+                'model'        : 'W2V',
+                'language'     : 'EN',
                 'scoreFunction': 'COSINE', 'pairs': pairs}
 
         headers = {

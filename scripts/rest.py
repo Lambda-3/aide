@@ -2,11 +2,15 @@
 import threading
 import roslib
 import rospy
+import config
 from mario.srv import GetSemRelatedFunctions, AddFunction, GetAllFunctions, GetFunction, AddRule, GetAllRules, GetRule
+from rdflib.term import URIRef
+
+from sparql_completer import QueryCompleter
 
 roslib.load_manifest("mario")
 
-from rospy import loginfo
+from rospy import loginfo, logdebug
 from flask import Flask
 from flask_cors import CORS
 from flask_restful import Api, fields, reqparse, Resource, abort, marshal
@@ -67,6 +71,11 @@ def parse_function():
     return args
 
 
+# This might be moved somewhere eventually
+completer = QueryCompleter(config.SCRIPTS_PATH + "/FancyOnthologyGraph.rdf", config.SCRIPTS_PATH +
+                           "/BackgroundKnowledgeGraph.rdf")
+
+
 class ResourceEnum(Enum):
     Function = {
         "get"         : lambda **args: get_service_handler(GetFunction).get_service()(**args).function,
@@ -89,10 +98,9 @@ class ResourceEnum(Enum):
 
     ReladedFunctions = {d: v for d, v in Functions.items() if d is not "post"}  # copy everything but post
     ReladedFunctions['get'] = (lambda top_k=3, **args:
-                               get_service_handler(GetSemRelatedFunctions).get_service()
-                               (top_k=top_k, **args).functions)
-    ReladedFunctions['path'] = (
-        "/mario/functions/<string:name>/related/<int:top_k>", "/mario/functions/<string:name>/related/")
+                               get_service_handler(GetSemRelatedFunctions).get_service()(top_k=top_k, **args).functions)
+    ReladedFunctions['path'] = ("/mario/functions/<string:name>/related/<int:top_k>",
+                                "/mario/functions/<string:name>/related/")
 
     Rules = {
         "post"          : lambda **args: get_service_handler(AddRule).get_service()(Rule(**args)).success,
@@ -110,6 +118,33 @@ class ResourceEnum(Enum):
         "marshal_with": None,
         "envelope"    : None,
         "path"        : "/mario/_version"
+    }
+
+    QueryProposals = {
+        "path"        : ("/mario/classes/<string:subject_class>/qp/<string:plain_text>/<int:top_k>",
+                         "/mario/classes/<string:subject_class>/qp/<string:plain_text>"),
+        "get"         : (lambda subject_class, plain_text, top_k=3:
+                         completer.get_queries_from_plaintext_and_subject(
+                             plain_text=plain_text, top_k=top_k,
+                             subject_class=URIRef("http://prokyon:5000/mario/classes/" + subject_class))),
+
+        "marshal_with": {
+            "code": fields.String,
+            "path": fields.String
+        },
+        "envelope"    : "proposals"
+
+    }
+
+    ClassProposals = {
+        "path"        : ("/mario/classes/<string:subject>/related/<int:top_k>",
+                         "/mario/classes/<string:subject>/related/"),
+        "get"         : (lambda subject, top_k=3: completer.get_subject_from_plaintext(subject)),
+        "marshal_with": {
+            "instance": fields.String,
+            "class"   : fields.String
+        },
+        "envelope"    : "classes"
     }
 
     Rule = {
@@ -190,7 +225,7 @@ def build_resources(api):
                 loginfo("POST request on {} with args {}".format(self.__class__, str(args)))
                 try:
                     result = rsc.post(**args)
-                    loginfo("Success, Result: " + str(result))
+                    logdebug("Success, Result: " + str(result))
                     return result
                 except rospy.ServiceException as e:
                     error = e.message.split("error processing request: ")[1]
@@ -215,6 +250,7 @@ def build_resources(api):
                 try:
                     loginfo("GET request on {} with args {}".format(self.__class__, str(kwargs)))
                     result = rsc.get(*args, **kwargs)
+                    loginfo(result)
                     if result or result == []:
                         try:
                             return marshal(result, rsc.marshal_with(), rsc.envelope())
