@@ -1,6 +1,8 @@
 import re
 import rospy
-import mario.srv as services
+import mario_messages.srv as services
+
+
 
 from rospy import loginfo, logdebug
 
@@ -38,7 +40,7 @@ class ServiceHandler:
 
     def __init__(self, service_name):
         # import the auto generated class corresponding to the service
-        exec """from mario.srv import {}""".format(service_name)
+        exec """from mario_messages.srv import {}""".format(service_name)
         # service channel is the service name converted to underscore notation
         self.SERVICE_CHANNEL = "mario/{}".format(cc_to_underscore(service_name))
         self.service_name = service_name

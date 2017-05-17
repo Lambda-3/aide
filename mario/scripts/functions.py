@@ -7,7 +7,7 @@ import roslib
 import pymongo
 import action_api as ros
 
-from mario.srv import AddFunction, CallFunction, GetFunction, GetAllFunctions, GetSemRelatedFunctions
+from mario_messages.srv import AddFunction, CallFunction, GetFunction, GetAllFunctions, GetSemRelatedFunctions
 
 roslib.load_manifest("mario")
 

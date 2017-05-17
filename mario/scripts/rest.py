@@ -3,7 +3,8 @@ import threading
 import roslib
 import rospy
 import config
-from mario.srv import GetSemRelatedFunctions, AddFunction, GetAllFunctions, GetFunction, AddRule, GetAllRules, GetRule
+from mario_messages.srv import (GetSemRelatedFunctions, AddFunction, GetAllFunctions, GetFunction, AddRule, GetAllRules,
+                                GetRule)
 from rdflib.term import URIRef
 
 from sparql_completer import QueryCompleter
@@ -16,7 +17,7 @@ from flask_cors import CORS
 from flask_restful import Api, fields, reqparse, Resource, abort, marshal
 from enum import Enum
 
-from mario.msg import Function, Rule
+from mario_messages.msg import Function, Rule
 from ros_services import get_service_handler
 
 rdf_class_fields = {

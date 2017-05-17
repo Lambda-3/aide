@@ -13,8 +13,8 @@ import config
 
 from rospy import loginfo, logdebug
 from ros_services import get_service_handler
-from mario.srv import GetAllRules, GetRule, AddRule, CallFunction
-from mario.msg import RdfTriple
+from mario_messages.srv import GetAllRules, GetRule, AddRule, CallFunction
+from mario_messages.msg import RdfTriple
 from rules import RuleHandler
 
 
@@ -58,8 +58,6 @@ def main():
             (None, None, URIRef("http://prokyon:5000/mario/fell"))))
         cep_and_kb.add_cleanup_function(lambda: cep_and_kb.remove(
             (None, None, None)))
-
-
 
         def create_triple_from_msg(msg):
             """

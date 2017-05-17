@@ -7,7 +7,7 @@ project(mario)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   tf
-  message_generation
+#   message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -44,32 +44,32 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-  FILES
-  Person.msg
-  Skeleton.msg
-  RdfTriple.msg
-  Function.msg
-  Rule.msg
-)
+# add_message_files(
+#   FILES
+#   Person.msg
+#   Skeleton.msg
+#   RdfTriple.msg
+#   Function.msg
+#   Rule.msg
+#  )
 
 ## Generate services in the 'srv' folder
-add_service_files(
-  FILES
-  AddFunction.srv
-  AddRule.srv
-  AddSpeech.srv
-  CallFunction.srv
-  GetAllFunctions.srv
-  GetAllRules.srv
-  GetFunction.srv
-  GetRule.srv
-  GetSemRelatedFunctions.srv
-  ResetTrackFace.srv
-  TrackFace.srv
-  TrackSkeleton.srv
+# add_service_files(
+#   FILES
+#   AddFunction.srv
+#   AddRule.srv
+#   AddSpeech.srv
+#   CallFunction.srv
+#   GetAllFunctions.srv
+#   GetAllRules.srv
+#   GetFunction.srv
+#   GetRule.srv
+#   GetSemRelatedFunctions.srv
+#   ResetTrackFace.srv
+#   TrackFace.srv
+#   TrackSkeleton.srv
 
-)
+# )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -79,11 +79,11 @@ add_service_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-  DEPENDENCIES
-  std_msgs  # Or other packages containing msgs
-  geometry_msgs
-)
+# generate_messages(
+#   DEPENDENCIES
+#   std_msgs  # Or other packages containing msgs
+#   geometry_msgs
+# )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -117,7 +117,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES tracking
-   CATKIN_DEPENDS message_runtime
+#    CATKIN_DEPENDS message_runtime
 #  DEPENDS system_lib
 )
 
