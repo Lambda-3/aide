@@ -3,7 +3,6 @@
 .rdf/
 log
 .classpath
-.gitignore
 .project
 bin
 .settings
