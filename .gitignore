@@ -2,3 +2,8 @@
 .idea
 .rdf/
 log
+.classpath
+.project
+bin
+.settings
+.gradle
