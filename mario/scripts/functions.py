@@ -10,7 +10,6 @@ import action_api as ros
 from mario_messages.srv import AddFunction, CallFunction, GetFunction, GetAllFunctions, GetSemRelatedFunctions
 
 roslib.load_manifest("mario")
-
 from ros_services import get_service_handler
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as rtd
 
@@ -113,9 +112,9 @@ class SimpleApi:
         pairs = [{"t1": name.replace("_", " "), "t2": row['name'].replace("_", " ")} for row in
                  self.functions_table.find({}, {"name": True, "_id": False})]
 
-        data = {'corpus'       : 'wiki-2014',
-                'model'        : 'W2V',
-                'language'     : 'EN',
+        data = {'corpus': 'wiki-2014',
+                'model': 'W2V',
+                'language': 'EN',
                 'scoreFunction': 'COSINE', 'pairs': pairs}
 
         headers = {
@@ -135,8 +134,9 @@ class SimpleApi:
 
 def main():
     rospy.init_node("functions")
+    loginfo("Creating api...")
     api = SimpleApi()
-
+    loginfo("Registering services...")
     get_service_handler(AddFunction).register_service(lambda function: api.add_from_text(**rtd(function)))
 
     get_service_handler(CallFunction).register_service(lambda func_name, kwargs: api.call(func_name, **json.loads(
@@ -147,6 +147,7 @@ def main():
     get_service_handler(GetAllFunctions).register_service(lambda: [x for x in api.get_all_functions()])
 
     get_service_handler(GetSemRelatedFunctions).register_service(api.get_best_matches)
+    loginfo("Registered services. Spinning.")
 
     rospy.spin()
 
