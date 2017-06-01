@@ -56,12 +56,15 @@ add_message_files(
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
+  AddApi.srv
   AddFunction.srv
   AddRule.srv
   AddSpeech.srv
   CallFunction.srv
+  GetAllApis.srv
   GetAllFunctions.srv
   GetAllRules.srv
+  GetApi.srv
   GetFunction.srv
   GetRule.srv
   GetSemRelatedFunctions.srv

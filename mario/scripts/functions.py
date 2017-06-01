@@ -5,9 +5,11 @@ import requests
 import rospy
 import roslib
 import pymongo
+from mario_messages.srv._GetApi import GetApi
+
 import action_api as ros
 
-from mario_messages.srv import AddFunction, CallFunction, GetFunction, GetAllFunctions, GetSemRelatedFunctions
+from mario_messages.srv import AddFunction, CallFunction, GetFunction, GetAllFunctions, GetSemRelatedFunctions, AddApi
 
 roslib.load_manifest("mario")
 from ros_services import get_service_handler
@@ -112,9 +114,9 @@ class SimpleApi:
         pairs = [{"t1": name.replace("_", " "), "t2": row['name'].replace("_", " ")} for row in
                  self.functions_table.find({}, {"name": True, "_id": False})]
 
-        data = {'corpus': 'wiki-2014',
-                'model': 'W2V',
-                'language': 'EN',
+        data = {'corpus'       : 'wiki-2014',
+                'model'        : 'W2V',
+                'language'     : 'EN',
                 'scoreFunction': 'COSINE', 'pairs': pairs}
 
         headers = {
@@ -148,6 +150,15 @@ def main():
 
     get_service_handler(GetSemRelatedFunctions).register_service(api.get_best_matches)
     loginfo("Registered services. Spinning.")
+
+    def test_post(api_name, file_content):
+        return {"success": True, "errors": "No Errors!"}
+
+    def test_get(name):
+        return "pass"
+
+    get_service_handler(GetApi).register_service(test_get)
+    get_service_handler(AddApi).register_service(test_post)
 
     rospy.spin()
 

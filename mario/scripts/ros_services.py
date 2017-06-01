@@ -2,8 +2,6 @@ import re
 import rospy
 import mario_messages.srv as services
 
-
-
 from rospy import loginfo, logdebug
 
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message as dtr
@@ -86,8 +84,8 @@ class ServiceHandler:
                 result = (result,)
 
             for i in range(number_of_slots):
-                result_in_slot = result[slot_names] if isinstance(result, dict) else result[i]
-                loginfo(result_in_slot)
+                result_in_slot = result[slot_names[i]] if isinstance(result, dict) else result[i]
+                logdebug("Result in slot: {}".format(result_in_slot))
                 slot_name = slot_names[i]
                 slot_type = slot_types[i]
 
@@ -132,7 +130,7 @@ class ServiceHandler:
 
                 else:
                     raise ValueError("{} is neither a dict nor a Ros Message!".format(result_in_slot))
-
+            loginfo("Returning: {} of type {}".format(response, type(response)))
             return response
 
         return rospy.Service(self.SERVICE_CHANNEL, self.service_class, improved_callback)
@@ -147,6 +145,10 @@ class ServiceHandler:
         """
         rospy.wait_for_service(self.SERVICE_CHANNEL)
         return rospy.ServiceProxy(self.SERVICE_CHANNEL, self.service_class)
+
+    def call_service(self, **kwargs):
+        rospy.wait_for_service(self.SERVICE_CHANNEL)
+        return rospy.ServiceProxy(self.SERVICE_CHANNEL, self.service_class)(**kwargs)
 
 
 # Create a list of all Services that are implemented
