@@ -162,7 +162,7 @@ public class RosCEPNode extends AbstractNodeMain {
 
         @Override
         public void onNewMessage(RdfTriple message) {
-            long timeInMilis = connectedNode.getCurrentTime().nsecs / 1000;
+            long timeInMilis = (long) (connectedNode.getCurrentTime().toSeconds() * 1000);
             log.info(message.getSubject() + " " + message.getPredicate() + " " + message.getObject());
             this.put(new RdfQuadruple(message.getSubject(), message.getPredicate(), message.getObject(), timeInMilis));
         }

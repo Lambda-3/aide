@@ -14,6 +14,12 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.google.gson.Gson;
+import com.hp.hpl.jena.datatypes.RDFDatatype;
+import com.hp.hpl.jena.datatypes.TypeMapper;
+import com.hp.hpl.jena.rdf.model.Literal;
+import com.hp.hpl.jena.rdf.model.impl.PropertyImpl;
+import com.hp.hpl.jena.rdf.model.impl.ResourceImpl;
+import com.hp.hpl.jena.rdf.model.impl.StatementImpl;
 
 import eu.larkc.csparql.common.RDFTable;
 import eu.larkc.csparql.common.RDFTuple;
@@ -22,7 +28,11 @@ import eu.larkc.csparql.core.engine.CsparqlQueryResultProxy;
 public class ExecuteRule extends AbstractRule {
     private String functionName;
     private static final Log log = LogFactory.getLog(ExecuteRule.class);
+    private static final TypeMapper typeMapper = TypeMapper.getInstance();
     private API api;
+    private long lastExecution = 0;
+    private int executionStep = 10000;
+    private int epsilon = 10;
 
     ExecuteRule(String name, String content) throws ParseException {
         super(name, content);
@@ -31,14 +41,46 @@ public class ExecuteRule extends AbstractRule {
 
     @Override
     public void update(Observable o, Object arg) {
+        long executionTime = System.currentTimeMillis();
+
         RDFTable q = (RDFTable) arg;
         Collection<String> names = q.getNames();
         Gson gson = new Gson();
         for (final RDFTuple t : q) {
+            if (lastExecution != 0 && (executionTime - lastExecution) < executionStep + epsilon) {
+                lastExecution = executionTime;
+                log.info("Delta too small. skipping");
+                return;
+            }
+
+            lastExecution = executionTime;
             int i = 0;
             Map<String, Object> dict = new HashMap<>();
             for (String name : names) {
-                dict.put(name, t.get(i));
+                String argument = t.get(i);
+                log.info("Argument: " + argument);
+                Object parsedArgument = null;
+                // argumentParts[0] is value argumentParts[1] is type.
+                String[] argumentParts = argument.split("\\^\\^");
+                if (argumentParts.length > 1) {
+                    String value = argumentParts[0].substring(1, argumentParts[0].length() - 1);
+                    String type = argumentParts[1];
+                    log.info("Argument value " + value + "; Argument Type: " + type);
+                    RDFDatatype d = typeMapper.getTypeByName(type);
+                    if (!(d == null)) {
+                        log.info("RDF Datatype: " + d.toString());
+                        parsedArgument = d.parse(value);
+                        log.info("Parsed Argument" + parsedArgument.toString());
+                    } else {
+                        log.info("Unknown RDF datatype. Assuming string");
+                        parsedArgument = argument;
+                    }
+                } else {
+                    log.info("Argument has no type, assuming string.");
+                    parsedArgument = argument;
+                }
+
+                dict.put(name, parsedArgument);
                 ++i;
             }
             String args = gson.toJson(dict);
