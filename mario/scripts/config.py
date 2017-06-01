@@ -2,6 +2,7 @@ from os.path import abspath
 
 PROJECT_PATH = abspath(__file__ + "../../../")
 SCRIPTS_PATH = abspath(PROJECT_PATH + "/scripts/")
+APIS_PATH = abspath(SCRIPTS_PATH + "/apis/")
 NAMESPACES_PATH = abspath(SCRIPTS_PATH + "/Namespaces.rdf")
 NAMESPACES_FORMAT = "turtle"
 ONTHOLOGY_PATH = abspath(SCRIPTS_PATH + "/simpleOnthology.rdf")

@@ -2,12 +2,16 @@
 import threading
 import roslib
 import rospy
+from mario_messages.srv._AddApi import AddApi
+
 import config
 from mario_messages.srv import (GetSemRelatedFunctions, AddFunction, GetAllFunctions, GetFunction, AddRule, GetAllRules,
-                                GetRule)
+                                GetRule, GetApi, GetAllApis)
 from rdflib.term import URIRef
 
 from sparql_completer import QueryCompleter
+
+from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as to_dict
 
 roslib.load_manifest("mario")
 
@@ -41,6 +45,15 @@ rule_fields_short = {
     'name'       : fields.String,
     'description': fields.String
 }
+
+
+def parse_api():
+    parser = reqparse.RequestParser()
+    parser.add_argument('file_content', required=True, type=str,
+                        help="must not be empty api!",
+                        location="json")
+
+    return parser.parse_args()
 
 
 def parse_rule():
@@ -79,46 +92,45 @@ completer = QueryCompleter(config.SCRIPTS_PATH + "/FancyOnthologyGraph.rdf", con
 
 class ResourceEnum(Enum):
     Function = {
-        "get"         : lambda **args: get_service_handler(GetFunction).get_service()(**args).function,
-        "marshal_with": {
-            'name': fields.String,
-            'doc' : fields.String,
-            'args': fields.List(fields.String),
-            'body': fields.String,
-        },
-        "path"        : "/mario/functions/<string:name>"
+        "get" : get_service_handler(GetFunction).call_service,
+        "path": "/mario/functions/<string:name>"
     }
 
     Functions = {
-        "post"          : lambda **args: get_service_handler(AddFunction).get_service()(Function(**args)).success,
-        "get"           : lambda: get_service_handler(GetAllFunctions).get_service()().functions,
-        "marshal_with"  : Function["marshal_with"],
-        "envelope"      : "functions",
+        "post"          : lambda **args: get_service_handler(AddFunction).get_service()(Function(**args)),
+        "get"           : get_service_handler(GetAllFunctions).call_service,
         "validate_input": parse_function,
     }
 
-    ReladedFunctions = {d: v for d, v in Functions.items() if d is not "post"}  # copy everything but post
-    ReladedFunctions['get'] = (lambda top_k=3, **args:
-                               get_service_handler(GetSemRelatedFunctions).get_service()(top_k=top_k, **args).functions)
-    ReladedFunctions['path'] = ("/mario/functions/<string:name>/related/<int:top_k>",
-                                "/mario/functions/<string:name>/related/")
+    Api = {
+        "get" : get_service_handler(GetApi).call_service,
+        "path": "/mario/apis/<string:name>"
+    }
+    Apis = {
+        "post"          : get_service_handler(AddApi).call_service,
+        "get"           : get_service_handler(GetAllApis).call_service,
+        "validate_input": parse_api
+    }
+
+    # Rule = {
+    #     "get" : get_service_handler(GetRule).call_service,
+    #     "path": "/mario/rules/<string:name>"
+    # }
 
     Rules = {
-        "post"          : lambda **args: get_service_handler(AddRule).get_service()(Rule(**args)).success,
-        "get"           : lambda: get_service_handler(GetAllRules).get_service()().rules,
-        "marshal_with"  : {
-            'name'       : fields.String,
-            'description': fields.String
-        },
-        "envelope"      : "rules",
+        "post"          : lambda **args: get_service_handler(AddRule).call_service(rule=Rule(**args)),
+        # "get"           : get_service_handler(GetAllRules).call_service,
         "validate_input": parse_rule,
     }
 
+    ReladedFunctions = {
+        "get" : get_service_handler(GetSemRelatedFunctions).call_service,
+        'path': "/mario/functions/<string:name>/related/<int:top_k>"
+    }
+
     Version = {
-        "get"         : lambda: {"version": '"Alluring Alliteration"'},
-        "marshal_with": None,
-        "envelope"    : None,
-        "path"        : "/mario/_version"
+        "get" : lambda: {"version": '"Alluring Alliteration"'},
+        "path": "/mario/_version"
     }
 
     QueryProposals = {
@@ -146,17 +158,6 @@ class ResourceEnum(Enum):
             "class"   : fields.String
         },
         "envelope"    : "classes"
-    }
-
-    Rule = {
-        "get"         : lambda **args: get_service_handler(GetRule).get_service()(**args).rule,
-        "marshal_with": {
-            'name'       : fields.String,
-            'description': fields.String,
-            'content'    : fields.String
-        },
-        "envelope"    : "rule",
-        "path"        : "/mario/rules/<string:name>"
     }
 
     def validate_input(self):
@@ -226,8 +227,8 @@ def build_resources(api):
                 loginfo("POST request on {} with args {}".format(self.__class__, str(args)))
                 try:
                     result = rsc.post(**args)
-                    logdebug("Success, Result: " + str(result))
-                    return result
+                    loginfo("Success, Result: {} of type {}".format(str(result), type(result)))
+                    return to_dict(result)
                 except rospy.ServiceException as e:
                     error = e.message.split("error processing request: ")[1]
                     loginfo("Unsuccessful, got following error: " + error)
@@ -251,14 +252,22 @@ def build_resources(api):
                 try:
                     loginfo("GET request on {} with args {}".format(self.__class__, str(kwargs)))
                     result = rsc.get(*args, **kwargs)
-                    loginfo(result)
+                    logdebug(result)
                     if result or result == []:
                         try:
                             return marshal(result, rsc.marshal_with(), rsc.envelope())
                         except AttributeError as e:
                             if "'NoneType' object has no attribute 'items'" in e.message:
                                 loginfo(e)
-                                return result
+                                try:
+                                    return to_dict(result)
+                                except AttributeError as e:
+                                    if e.message == """'dict' object has no attribute '__slots__'""":
+                                        logdebug("result is already dict")
+                                        return result
+                                    else:
+                                        raise e
+
                             else:
                                 raise AttributeError(e)
                 except rospy.ServiceException as e:

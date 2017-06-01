@@ -5,12 +5,13 @@ import requests
 import rospy
 import roslib
 import pymongo
+from mario_messages.srv._GetApi import GetApi
+
 import action_api as ros
 
-from mario_messages.srv import AddFunction, CallFunction, GetFunction, GetAllFunctions, GetSemRelatedFunctions
+from mario_messages.srv import AddFunction, CallFunction, GetFunction, GetAllFunctions, GetSemRelatedFunctions, AddApi
 
 roslib.load_manifest("mario")
-
 from ros_services import get_service_handler
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as rtd
 
@@ -135,8 +136,9 @@ class SimpleApi:
 
 def main():
     rospy.init_node("functions")
+    loginfo("Creating api...")
     api = SimpleApi()
-
+    loginfo("Registering services...")
     get_service_handler(AddFunction).register_service(lambda function: api.add_from_text(**rtd(function)))
 
     get_service_handler(CallFunction).register_service(lambda func_name, kwargs: api.call(func_name, **json.loads(
@@ -147,6 +149,16 @@ def main():
     get_service_handler(GetAllFunctions).register_service(lambda: [x for x in api.get_all_functions()])
 
     get_service_handler(GetSemRelatedFunctions).register_service(api.get_best_matches)
+    loginfo("Registered services. Spinning.")
+
+    def test_post(api_name, file_content):
+        return {"success": True, "errors": "No Errors!"}
+
+    def test_get(name):
+        return "pass"
+
+    get_service_handler(GetApi).register_service(test_get)
+    get_service_handler(AddApi).register_service(test_post)
 
     rospy.spin()
 
