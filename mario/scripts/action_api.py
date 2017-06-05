@@ -28,7 +28,7 @@ class LocationService:
         wifi_stations = [dict(zip(["macAddress", "channel", "signalStrength"], map(format_rows, row.split())))
                          for row in mac_adresses.split("BSSID") if row]
 
-        data = {'considerIp': 'false',
+        data = {'considerIp'      : 'false',
                 'wifiAccessPoints': wifi_stations}
         headers = {
             'content-type': "application/json"
@@ -52,11 +52,10 @@ class PhoneService:
         print("Hanging up.")
         print(20 * "=")
 
-
-def send_message(self, number, message):
-    print(20 * "=")
-    print("Sending message to {} with content \"{}\".".format(number, message))
-    print(20 * "=")
+    def send_message(self, number, message):
+        print(20 * "=")
+        print("Sending message to {} with content \"{}\".".format(number, message))
+        print(20 * "=")
 
 
 class DummyMover:

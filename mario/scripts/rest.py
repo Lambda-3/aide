@@ -49,6 +49,10 @@ rule_fields_short = {
 
 def parse_api():
     parser = reqparse.RequestParser()
+
+    parser.add_argument('name', required=True, type=str,
+                        help="Api needs name!",
+                        location="json")
     parser.add_argument('file_content', required=True, type=str,
                         help="must not be empty api!",
                         location="json")

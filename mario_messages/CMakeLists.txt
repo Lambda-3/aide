@@ -46,11 +46,14 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  Person.msg
-  Skeleton.msg
-  RdfTriple.msg
   Function.msg
+  Person.msg
+  RdfGraph.msg
+  RdfGraphStamped.msg
+  RdfTriple.msg
+  RdfTripleStamped.msg
   Rule.msg
+  Skeleton.msg
 )
 
 ## Generate services in the 'srv' folder
