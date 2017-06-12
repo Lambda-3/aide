@@ -96,10 +96,9 @@ if __name__ == '__main__':
 
     publisher = rospy.Publisher("/mario/test_node", String, queue_size=50)
 
-    publisher = rospy.Publisher("/mario/update_apis", Bool, queue_size=50)
     loginfo("Creating extractor handler...")
     extractor_handler = ExtractorHandler()
-    rospy.Subscriber("/mario/update_apis", Bool, lambda x: extractor_handler.reload_api_references() if x else ())
+    rospy.Subscriber("/mario/update_apis", Bool, lambda x: extractor_handler.reload_api_references() if x.data else ())
     loginfo("Registering services...")
     # TODO: add / get / getAll
     loginfo("Registered services. Spinning.")

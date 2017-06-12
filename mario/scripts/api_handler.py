@@ -30,10 +30,10 @@ from rospy import loginfo
 class ApiHandler:
     def __init__(self, notify_function):
         self.db = pymongo.MongoClient().db
-        self.db.functions_api.create_index("name", unique=True)
+        #self.db.functions_api.create_index([("name", pymongo.TEXT), ("api", pymongo.TEXT)], unique=True)
         self.functions_api_table = self.db.functions_api
         # self.apis_table = self.db.api
-        self.db.apis.create_index("name", unique=True)
+        # "name", unique=True)
 
         # for the time being just load out of the folder /apis folder
         api_files = self.get_all_api_files()

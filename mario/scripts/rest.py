@@ -3,10 +3,12 @@ import threading
 import roslib
 import rospy
 from mario_messages.srv._AddApi import AddApi
+from mario_messages.srv._GetExtractor import GetExtractor
 
 import config
 from mario_messages.srv import (GetSemRelatedFunctions, AddFunction, GetAllFunctions, GetFunction, AddRule, GetAllRules,
-                                GetRule, GetApi, GetAllApis)
+                                GetRule, GetApi, GetAllApis, GetActionProvider, GetAllActionProviders,
+                                AddActionProvider, AddExtractor, GetAllExtractors)
 from rdflib.term import URIRef
 
 from sparql_completer import QueryCompleter
@@ -25,24 +27,24 @@ from mario_messages.msg import Function, Rule
 from ros_services import get_service_handler
 
 rdf_class_fields = {
-    'URI'  : fields.String(attribute="queried_name"),
+    'URI': fields.String(attribute="queried_name"),
     'label': fields.String(attribute="class_label")
 }
 
 rdf_property_fields = {
-    'URI'   : fields.String(attribute="name"),
-    'label' : fields.String,
+    'URI': fields.String(attribute="name"),
+    'label': fields.String,
     'domain': fields.String,
-    'range' : fields.String
+    'range': fields.String
 }
 
 namespace_fields = {
-    'URI'      : fields.String,
+    'URI': fields.String,
     'namespace': fields.String
 }
 
 rule_fields_short = {
-    'name'       : fields.String,
+    'name': fields.String,
     'description': fields.String
 }
 
@@ -96,23 +98,43 @@ completer = QueryCompleter(config.SCRIPTS_PATH + "/FancyOnthologyGraph.rdf", con
 
 class ResourceEnum(Enum):
     Function = {
-        "get" : get_service_handler(GetFunction).call_service,
+        "get": get_service_handler(GetFunction).call_service,
         "path": "/mario/functions/<string:name>"
     }
 
+    ActionProvider = {
+        "get": get_service_handler(GetActionProvider).call_service,
+        "path": "/mario/action_providers/<string:name>"
+    }
+    ActionProviders = {
+        "post": get_service_handler(AddActionProvider).call_service,
+        "get": get_service_handler(GetAllActionProviders).call_service,
+        "validate_input": parse_api
+    }
+
+    Extractor = {
+        "get": get_service_handler(GetExtractor).call_service,
+        "path": "/mario/extractors/<string:name>"
+    }
+    Extractors = {
+        "post": get_service_handler(AddExtractor).call_service,
+        "get": get_service_handler(GetAllExtractors).call_service,
+        "validate_input": parse_api
+    }
+
     Functions = {
-        "post"          : lambda **args: get_service_handler(AddFunction).get_service()(Function(**args)),
-        "get"           : get_service_handler(GetAllFunctions).call_service,
+        "post": lambda **args: get_service_handler(AddFunction).get_service()(Function(**args)),
+        "get": get_service_handler(GetAllFunctions).call_service,
         "validate_input": parse_function,
     }
 
     Api = {
-        "get" : get_service_handler(GetApi).call_service,
+        "get": get_service_handler(GetApi).call_service,
         "path": "/mario/apis/<string:name>"
     }
     Apis = {
-        "post"          : get_service_handler(AddApi).call_service,
-        "get"           : get_service_handler(GetAllApis).call_service,
+        "post": get_service_handler(AddApi).call_service,
+        "get": get_service_handler(GetAllApis).call_service,
         "validate_input": parse_api
     }
 
@@ -122,46 +144,46 @@ class ResourceEnum(Enum):
     # }
 
     Rules = {
-        "post"          : lambda **args: get_service_handler(AddRule).call_service(rule=Rule(**args)),
+        "post": lambda **args: get_service_handler(AddRule).call_service(rule=Rule(**args)),
         # "get"           : get_service_handler(GetAllRules).call_service,
         "validate_input": parse_rule,
     }
 
     ReladedFunctions = {
-        "get" : get_service_handler(GetSemRelatedFunctions).call_service,
+        "get": get_service_handler(GetSemRelatedFunctions).call_service,
         'path': "/mario/functions/<string:name>/related/<int:top_k>"
     }
 
     Version = {
-        "get" : lambda: {"version": '"Alluring Alliteration"'},
+        "get": lambda: {"version": '"Alluring Alliteration"'},
         "path": "/mario/_version"
     }
 
     QueryProposals = {
-        "path"        : ("/mario/classes/<string:subject_class>/qp/<string:plain_text>/<int:top_k>",
-                         "/mario/classes/<string:subject_class>/qp/<string:plain_text>"),
-        "get"         : (lambda subject_class, plain_text, top_k=3:
-                         completer.get_queries_from_plaintext_and_subject(
-                             plain_text=plain_text, top_k=top_k,
-                             subject_class=URIRef("http://prokyon:5000/mario/classes/" + subject_class))),
+        "path": ("/mario/classes/<string:subject_class>/qp/<string:plain_text>/<int:top_k>",
+                 "/mario/classes/<string:subject_class>/qp/<string:plain_text>"),
+        "get": (lambda subject_class, plain_text, top_k=3:
+                completer.get_queries_from_plaintext_and_subject(
+                    plain_text=plain_text, top_k=top_k,
+                    subject_class=URIRef("http://prokyon:5000/mario/classes/" + subject_class))),
 
         "marshal_with": {
             "code": fields.String,
             "path": fields.String
         },
-        "envelope"    : "proposals"
+        "envelope": "proposals"
 
     }
 
     ClassProposals = {
-        "path"        : ("/mario/classes/<string:subject>/related/<int:top_k>",
-                         "/mario/classes/<string:subject>/related/"),
-        "get"         : (lambda subject, top_k=3: completer.get_subject_from_plaintext(subject)),
+        "path": ("/mario/classes/<string:subject>/related/<int:top_k>",
+                 "/mario/classes/<string:subject>/related/"),
+        "get": (lambda subject, top_k=3: completer.get_subject_from_plaintext(subject)),
         "marshal_with": {
             "instance": fields.String,
-            "class"   : fields.String
+            "class": fields.String
         },
-        "envelope"    : "classes"
+        "envelope": "classes"
     }
 
     def validate_input(self):

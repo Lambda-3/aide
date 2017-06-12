@@ -1,5 +1,5 @@
 def do_fancy_stuff(x):
-    return x + 1
+    return x + 3
 
 
 def fancify_string(string):

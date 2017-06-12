@@ -1,9 +1,13 @@
 #!/usr/bin/env python
+import reimport as reimport
 import rospy
 import roslib
-from rospy.core import logerror
+from std_msgs.msg import Bool
 
 roslib.load_manifest("mario")
+from rospy.core import logerror
+
+from rospy import loginfo
 
 import inspect
 import json
@@ -22,8 +26,6 @@ from mario_messages.srv import CallFunction, GetSemRelatedFunctions
 import config
 
 from ros_services import get_service_handler
-
-from rospy import loginfo
 
 
 class ActionHandler:
@@ -56,6 +58,10 @@ class ActionHandler:
                 return None
             else:
                 raise IOError(e)
+
+    def reload_api_references(self):
+        for module in reimport.modified():
+            reimport.reimport(module)
 
     def add_action_provider(self, name, file_content):
         # class_name = re.findall("class\s+(.*?)[\(,:]", file_content)[0]
@@ -91,6 +97,7 @@ class ActionHandler:
         loginfo("   adding funcs: {}".format(actions))
         self.actions_table.delete_many({"api": name})
         self.actions_table.insert_many(actions)
+        loginfo("   setting: self.{} = {}".format(name, imported_action_provider))
         setattr(self, name, imported_action_provider)
         return (True, "")
 
@@ -103,6 +110,7 @@ class ActionHandler:
                     new_kwargs[k] = eval("apis." + v)
                 except:
                     new_kwargs[k] = v
+            loginfo("Calling function {}.{}".format(api, func))
             getattr(getattr(self, api), func)(**new_kwargs)
         except KeyError:
             raise ValueError("There is no function {} in api {}!".format(func, api))
@@ -135,9 +143,9 @@ class ActionHandler:
                                                       api=row['api'].rsplit("_")[0])}
                  for row in self.actions_table.find({}, {"name": True, "api": True, "_id": True})]
 
-        data = {'corpus'       : 'wiki-2014',
-                'model'        : 'W2V',
-                'language'     : 'EN',
+        data = {'corpus': 'wiki-2014',
+                'model': 'W2V',
+                'language': 'EN',
                 'scoreFunction': 'COSINE', 'pairs': pairs}
 
         headers = {
@@ -160,12 +168,14 @@ class ActionHandler:
 def main():
     rospy.init_node("apis")
     loginfo("Creating action handler...")
-    api = ActionHandler()
+    action_handler = ActionHandler()
     loginfo("Registering services...")
 
-    get_service_handler(CallFunction).register_service(lambda func_name, kwargs: api.call_func(func_name, **json.loads(
-        kwargs)))
-    get_service_handler(GetSemRelatedFunctions).register_service(api.get_best_matches)
+    get_service_handler(CallFunction).register_service(
+        lambda func_name, kwargs: action_handler.call_func(func_name, **json.loads(
+            kwargs)))
+    get_service_handler(GetSemRelatedFunctions).register_service(action_handler.get_best_matches)
+    rospy.Subscriber("/mario/update_apis", Bool, lambda x: action_handler.reload_api_references() if x.data else ())
 
     loginfo("Registered services. Spinning.")
 

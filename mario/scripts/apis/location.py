@@ -11,6 +11,7 @@ def get_location():
     # get all wifis using nmcli.
     mac_adresses = subprocess.check_output(
         ["nmcli", "-t", "-m", "multiline", "-f", "BSSID,CHAN,SIGNAL", "dev", "wifi", "list"])
+    
     format_rows = lambda x: x.split(":", 1)[1] if not x.startswith("SIGNAL") else (int(x.split(":", 1)[1]) / 2) - 92
 
     # apply formatting and zip with field descriptions to comply to the geolocate api format
