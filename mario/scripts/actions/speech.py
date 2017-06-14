@@ -4,8 +4,8 @@ from sound_play.libsoundplay import SoundClient
 
 
 def say(text):
-    #_say(text)
-    os.system('espeak "{}" 2> /dev/null'.format(text))
+    _say(text)
+    # os.system('espeak "{}" 2> /dev/null'.format(text))
 
 def pprint(text):
     print text

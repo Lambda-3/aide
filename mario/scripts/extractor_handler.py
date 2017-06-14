@@ -22,7 +22,7 @@ from ros_services import cc_to_underscore
 class ExtractorHandler(object):
     def __init__(self):
         self.load_all_extractors()
-        self.extractors = dict()
+        self.extractors = []
         extractor_files = self.get_all_extractor_files()
 
         for file_name in extractor_files:
@@ -36,19 +36,23 @@ class ExtractorHandler(object):
 
     def reload_api_references(self):
         for module in reimport.modified():
-            reimport.reimport(module)
+            if not module == "__main__":
+                loginfo("Module {} changed. reloading...".format(module))
+                reimport.reimport(module)
 
-    def register_extractor(self, extractor):
+    def register_extractor(self, ExtractorClass):
         """
 
         :type extractor: AbstractExtractor
         """
-        name = extractor.__class__.__name__
-        publisher = rospy.Publisher("/mario/rdf", RdfGraphStamped, queue_size=extractor.queue_size)
-        subscriber = rospy.Subscriber(extractor.from_channel, extractor.type, lambda msg: publisher.publish(
-            extractor.transform(msg)))
+        # name = ExtractorClass.__name__
+        publisher = rospy.Publisher("/mario/rdf", RdfGraphStamped, queue_size=ExtractorClass.queue_size)
 
-        self.extractors[name] = {"extractor": extractor, "publisher": publisher, "subscriber": subscriber}
+        extractor = ExtractorClass(publisher=publisher)
+
+        # subscriber = rospy.Subscriber(extractor.from_channel, extractor.type, callback)
+
+        self.extractors.append(extractor)
 
     def add_extractor(self, file_content):
         class_name = re.findall("class\s+(.*?)[\(,:]", file_content)[0]
@@ -76,7 +80,7 @@ class ExtractorHandler(object):
             logerror(e)
             return (False, traceback.format_exc(1))
         loginfo("   ...imported!")
-        self.register_extractor(ExtractorClass())
+        self.register_extractor(ExtractorClass)
         loginfo("   ...registered!")
         return (True, "")
 
