@@ -23,8 +23,8 @@ public abstract class AbstractRule implements Observer {
             + "prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> "
             + "prefix rules: <http://prokyon:5000/mario/rules/> "
             + "prefix skeletons: <http://prokyon:5000/mario/skeletons/> "
-            + "prefix xml: <http://www.w3.org/XML/1998/namespace> "
-            + "prefix xsd: <http://www.w3.org/2001/XMLSchema#> ";
+            + "prefix xml: <http://www.w3.org/XML/1998/namespace> " + "prefix xsd: <http://www.w3.org/2001/XMLSchema#> "
+            + "PREFIX f: <http://larkc.eu/csparql/sparql/jena/ext#> ";
 
     AbstractRule(String name, String content) throws ParseException {
         log.info("Creating Rule...");

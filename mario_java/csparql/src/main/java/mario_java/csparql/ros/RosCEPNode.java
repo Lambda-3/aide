@@ -17,6 +17,8 @@
 package mario_java.csparql.ros;
 
 import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.ros.exception.RemoteException;
@@ -46,7 +48,8 @@ import mario_messages.AddRuleResponse;
 import mario_messages.CallFunction;
 import mario_messages.CallFunctionRequest;
 import mario_messages.CallFunctionResponse;
-import mario_messages.RdfTriple;
+import mario_messages.RdfGraphStamped;
+import mario_messages.RdfTripleStamped;
 
 /**
  * A simple {@link Subscriber} {@link NodeMain}.
@@ -83,7 +86,7 @@ public class RosCEPNode extends AbstractNodeMain {
     private RdfStream registerStreamListener() {
 
         RosRdfStream stream = new RosRdfStream("http://myexample.org/stream");
-        Subscriber<RdfTriple> subscriber = connectedNode.newSubscriber("mario/rdf", RdfTriple._TYPE);
+        Subscriber<RdfGraphStamped> subscriber = connectedNode.newSubscriber("mario/rdf", RdfGraphStamped._TYPE);
         subscriber.addMessageListener(stream);
         return stream;
     }
@@ -110,14 +113,24 @@ public class RosCEPNode extends AbstractNodeMain {
 
     private OutStream registerOutStream() {
         return new OutStream() {
-            private Publisher<RdfTriple> publisher = connectedNode.newPublisher("mario/rdf", RdfTriple._TYPE);
+            private Publisher<RdfGraphStamped> publisher = connectedNode.newPublisher("mario/rdf",
+                    RdfGraphStamped._TYPE);
 
             @Override
-            public void put(RDFTuple triple) {
-                RdfTriple msg = publisher.newMessage();
-                msg.setSubject(triple.get(0));
-                msg.setPredicate(triple.get(1));
-                msg.setSubject(triple.get(2));
+            public void put(List<RDFTuple> triples) {
+                RdfGraphStamped msg = publisher.newMessage();
+                List<RdfTripleStamped> stampedTriples = msg.getQuadruples();
+                for (RDFTuple triple : triples) {
+                    RdfTripleStamped stampedTriple = connectedNode.getTopicMessageFactory()
+                            .newFromType(RdfTripleStamped._TYPE);
+                    stampedTriple.setSubject(triple.get(0));
+                    stampedTriple.setPredicate(triple.get(1));
+                    stampedTriple.setSubject(triple.get(2));
+                    stampedTriple.setStamp(connectedNode.getCurrentTime());
+                    stampedTriples.add(stampedTriple);
+                }
+                msg.setQuadruples(stampedTriples);
+
                 publisher.publish(msg);
             }
         };
@@ -154,17 +167,19 @@ public class RosCEPNode extends AbstractNodeMain {
         };
     }
 
-    private class RosRdfStream extends RdfStream implements MessageListener<RdfTriple> {
+    private class RosRdfStream extends RdfStream implements MessageListener<RdfGraphStamped> {
 
         public RosRdfStream(String iri) {
             super(iri);
         }
 
         @Override
-        public void onNewMessage(RdfTriple message) {
-            long timeInMilis = (long) (connectedNode.getCurrentTime().toSeconds() * 1000);
-            log.info(message.getSubject() + " " + message.getPredicate() + " " + message.getObject());
-            this.put(new RdfQuadruple(message.getSubject(), message.getPredicate(), message.getObject(), timeInMilis));
+        public void onNewMessage(RdfGraphStamped graph) {
+            for (RdfTripleStamped triple : graph.getQuadruples()) {
+                long timeInMilis = (long) (triple.getStamp().toSeconds() * 1000);
+                log.info(triple.getSubject() + " " + triple.getPredicate() + " " + triple.getObject());
+                this.put(new RdfQuadruple(triple.getSubject(), triple.getPredicate(), triple.getObject(), timeInMilis));
+            }
         }
 
     }
