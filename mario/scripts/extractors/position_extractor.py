@@ -4,7 +4,7 @@ from mario_messages.msg import RdfGraphStamped, RdfTripleStamped
 from rospy import loginfo
 from tf2_msgs.msg._TFMessage import TFMessage
 
-from apis.rdf_utils import literalize, Graph, Triple
+from apis.rdf_utils import literalize, Graph, Triple, mario, properties
 from extractors import AbstractExtractor
 
 
@@ -25,8 +25,8 @@ class PositionExtractor(AbstractExtractor):
         """
         time = self.get_time()
         try:
-            ((x, y, z), rot) = self.listener.lookupTransform('/map', '/base_footprint', rospy.Time(0))
-            return Graph(Triple("mario:self", "properties:position_x", x, time),
-                         Triple("mario:self", "properties:position_y", y, time))
+            ((x, y, z), rot) = self.listener.lookupTransform(self.MAP_LINK, self.ROBOT_LINK, rospy.Time(0))
+            return Graph(Triple(mario.self, properties.position_x, x, time),
+                         Triple(mario.self, properties.position_y, y, time))
         except:
             return None

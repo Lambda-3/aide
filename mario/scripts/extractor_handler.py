@@ -18,6 +18,8 @@ import imp
 import config
 from ros_services import cc_to_underscore
 
+excluded = ["position_extractor.py", "speech_extractor.py"]
+
 
 class ExtractorHandler(object):
     def __init__(self):
@@ -43,7 +45,7 @@ class ExtractorHandler(object):
     def register_extractor(self, ExtractorClass):
         """
 
-        :type extractor: AbstractExtractor
+        :type ExtractorClass: AbstractExtractor
         """
         # name = ExtractorClass.__name__
         publisher = rospy.Publisher("/mario/rdf", RdfGraphStamped, queue_size=ExtractorClass.queue_size)
@@ -91,6 +93,8 @@ class ExtractorHandler(object):
         """
         api_files = []
         for (dirpath, _, file_names) in os.walk(config.EXTRACTORS_PATH):
+            file_names = [f for f in file_names if f not in excluded]
+            print file_names
             api_files.extend([dirpath + "/" + x for x in file_names if not x.startswith("__") and x.endswith(".py")])
         return api_files
 

@@ -1,10 +1,10 @@
 import threading
 
 import rospy
-from mario_messages.msg import RdfGraphStamped, RdfTripleStamped
+from uuid import uuid4 as uuid
 from speech_recognition import Microphone, Recognizer, UnknownValueError, RequestError
 
-from apis.rdf_utils import Graph, Triple
+from apis.rdf_utils import Graph, Triple, speech, properties
 
 
 class SpeechExtractor(object):
@@ -25,7 +25,7 @@ class SpeechExtractor(object):
                 audio = self.recognizer.listen(source)
                 text = self.process_audio(audio)
                 if text:
-                    self.publisher.publish(Graph(Triple("mario:kek", "properties:speech", text)))
+                    self.publisher.publish(Graph(Triple(speech[uuid().hex], properties.speech, text)))
 
     def process_audio(self, audio):
         """

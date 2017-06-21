@@ -92,15 +92,17 @@ class AbstractTopicExtractor(AbstractExtractor):
                 self.publisher.publish(result)
                 self.new = not self.only_new
             # rate = rospy.Rate(self.rate) if isinstance(self.rate, int) else self.rate
-            rospy.sleep(self.rate)
+            rospy.Rate(self.rate).sleep()
 
     @property
     def message(self):
         try:
             return self._msg
         except AttributeError:
+            name = self.__class__.__name__
+            loginfo("{} is waiting for the first message...".format(name))
             while "_msg" not in self.__dict__ and not rospy.is_shutdown():
-                loginfo("Waiting for first message...")
-                rospy.sleep(self.rate)
+                rospy.Rate(self.rate).sleep()
             if not rospy.is_shutdown():
+                loginfo("{} got first message.".format(name))
                 return self._msg
