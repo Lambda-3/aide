@@ -18,7 +18,7 @@ import imp
 import config
 from ros_services import cc_to_underscore
 
-excluded = ["position_extractor.py", "speech_extractor.py"]
+excluded = ["speech_extractor.py"]
 
 
 class ExtractorHandler(object):

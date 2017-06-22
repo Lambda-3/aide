@@ -13,6 +13,7 @@ def move(x, y):
     goal.target_pose.header.stamp = rospy.Time.now()
     goal.target_pose.pose.position.x = x
     goal.target_pose.pose.position.y = y
+    goal.target_pose.pose.orientation.w = 1
     client.send_goal(goal)
     success = client.wait_for_result(rospy.Duration(60))
     loginfo(success)

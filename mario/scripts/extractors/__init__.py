@@ -87,7 +87,8 @@ class AbstractTopicExtractor(AbstractExtractor):
 
     def run_forever(self):
         while not rospy.is_shutdown():
-            result = (self.extract())
+
+            result = self.extract()
             if result and self.new:
                 self.publisher.publish(result)
                 self.new = not self.only_new

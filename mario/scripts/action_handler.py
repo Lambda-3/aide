@@ -61,7 +61,9 @@ class ActionHandler:
 
     def reload_api_references(self):
         for module in reimport.modified():
-            reimport.reimport(module)
+            if not module == "__main__":
+                loginfo("Module {} changed. reloading...".format(module))
+                reimport.reimport(module)
 
     def add_action_provider(self, name, file_content):
         # class_name = re.findall("class\s+(.*?)[\(,:]", file_content)[0]
@@ -106,11 +108,17 @@ class ActionHandler:
         try:
             new_kwargs = dict()
             for k, v in kwargs.items():
-                try:
-                    new_kwargs[k] = eval("apis." + v)
-                except:
+                loginfo("Argument: {} = {}".format(k, v))
+                if isinstance(v, str) and v.startswith("eval:"):
+                    v = v[5:]
+                    loginfo("Trying to eval: apis." + v)
+                    result = eval("apis." + v)
+                    new_kwargs[k] = result
+                    loginfo("Evaluated {0} as apis.{0}. Result is {1}.".format(v, result))
+                else:
+                    loginfo("Assuming argument is literal.")
                     new_kwargs[k] = v
-            loginfo("Calling function {}.{}".format(api, func))
+            loginfo("Calling function {}.{} with args {}".format(api, func, new_kwargs))
             getattr(getattr(self, api), func)(**new_kwargs)
         except KeyError:
             raise ValueError("There is no function {} in api {}!".format(func, api))
@@ -143,9 +151,9 @@ class ActionHandler:
                                                       api=row['api'].rsplit("_")[0])}
                  for row in self.actions_table.find({}, {"name": True, "api": True, "_id": True})]
 
-        data = {'corpus': 'wiki-2014',
-                'model': 'W2V',
-                'language': 'EN',
+        data = {'corpus'       : 'wiki-2014',
+                'model'        : 'W2V',
+                'language'     : 'EN',
                 'scoreFunction': 'COSINE', 'pairs': pairs}
 
         headers = {
