@@ -58,6 +58,7 @@ public class RosCEPNode extends AbstractNodeMain {
     private ConnectedNode connectedNode;
     private Log log;
     private CEP cep;
+    private boolean simulation = false;
 
     @Override
     public GraphName getDefaultNodeName() {
@@ -66,6 +67,18 @@ public class RosCEPNode extends AbstractNodeMain {
 
     @Override
     public void onStart(final ConnectedNode connectedNode) {
+        Subscriber<rosgraph_msgs.Clock> simulationDetector = connectedNode.newSubscriber("/clock",
+                rosgraph_msgs.Clock._TYPE);
+        simulationDetector.addMessageListener(new MessageListener<rosgraph_msgs.Clock>() {
+
+            @Override
+            public void onNewMessage(rosgraph_msgs.Clock arg0) {
+                // if there is a message on this channel, it means time
+                // is simulated. fk this shit then.
+                simulation = true;
+            }
+        });
+
         this.connectedNode = connectedNode;
         this.log = connectedNode.getLog();
 
@@ -176,7 +189,14 @@ public class RosCEPNode extends AbstractNodeMain {
         @Override
         public void onNewMessage(RdfGraphStamped graph) {
             for (RdfTripleStamped triple : graph.getQuadruples()) {
-                long timeInMilis = (long) (triple.getStamp().toSeconds() * 1000);
+                long timeInMilis;
+
+                if (!simulation) {
+                    timeInMilis = (long) (triple.getStamp().toSeconds() * 1000);
+                } else {
+                    timeInMilis = System.currentTimeMillis();
+                }
+                log.info(String.format("Time: %d", timeInMilis));
                 log.info(triple.getSubject() + " " + triple.getPredicate() + " " + triple.getObject());
                 this.put(new RdfQuadruple(triple.getSubject(), triple.getPredicate(), triple.getObject(), timeInMilis));
             }
