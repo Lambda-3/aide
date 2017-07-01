@@ -1,10 +1,8 @@
 package mario_java.csparql.cep;
 
 import java.text.ParseException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Observable;
 import java.util.regex.Matcher;
@@ -16,13 +14,13 @@ import org.apache.commons.logging.LogFactory;
 import com.google.gson.Gson;
 import com.hp.hpl.jena.datatypes.RDFDatatype;
 import com.hp.hpl.jena.datatypes.TypeMapper;
-import com.hp.hpl.jena.datatypes.BaseDatatype.TypedValue;
+import com.hp.hpl.jena.datatypes.xsd.XSDDatatype;
 
 import eu.larkc.csparql.common.RDFTable;
 import eu.larkc.csparql.common.RDFTuple;
 import eu.larkc.csparql.core.engine.CsparqlQueryResultProxy;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class ExecuteRule extends AbstractRule {
     private String functionName;
@@ -33,6 +31,7 @@ public class ExecuteRule extends AbstractRule {
     private int executionStep;
     private int epsilon = 5;
     private boolean newOnly;
+    private boolean precise;
     private boolean argless;
 
     ExecuteRule(String name, String content) throws ParseException {
@@ -61,12 +60,38 @@ public class ExecuteRule extends AbstractRule {
                 return;
             }
 
-            lastExecution = executionTime;
+            if (this.precise) {
+                int i = 0;
+                String argument = null;
+                for (String name : names) {
+                    if (name.equals("ts")) {
+                        argument = t.get(i);
+                        continue;
+                    }
+                    ++i;
+                }
+                if (argument == null) {
+                    throw new IllegalStateException("Cannot have Precise rule without timestamp!");
+                }
+                log.debug("Timestamp: " + argument);
+                long timestamp = (long) XSDDatatype.XSDlong.parse(argument.split("\\^\\^")[0].replaceAll("\"", ""));
+                if (lastExecution == timestamp) {
+                    log.info("Regarding the same event. skipping");
+                    continue;
+                } else {
+                    lastExecution = timestamp;
+                }
+            }
+            if (this.newOnly)
+                lastExecution = executionTime;
             int i = 0;
             // gonna save the arguments here
             Map<String, Object> dict = new HashMap<>();
-            // for every column in the result row
+
+            // if rule has arguments (if not, only argument is dummy_arg and we
+            // dont need it it's just there so some result is fetched)
             if (!argless) {
+                // for every column in the result row
                 for (String name : names) {
                     String argument = t.get(i);
                     log.info("Argument: " + argument);
@@ -88,7 +113,7 @@ public class ExecuteRule extends AbstractRule {
                             // if datatype is known, parse it
                             log.info("RDF Datatype: " + d.toString());
                             parsedArgument = d.parse(value);
-                            log.info("Parsed Argument" + parsedArgument.toString());
+                            log.info("Parsed Argument: " + parsedArgument.toString());
                         } else {
                             // if not, assume string
                             log.info("Unknown RDF datatype. Assuming string");
@@ -109,6 +134,7 @@ public class ExecuteRule extends AbstractRule {
             // convert args to json
             String args = gson.toJson(dict);
             log.info(String.format("Function name: %s, args: %s", this.functionName, args));
+
             this.api.call(this.functionName, args);
         }
 
@@ -124,10 +150,17 @@ public class ExecuteRule extends AbstractRule {
     }
 
     protected String parseContent(String rawContent) throws ParseException {
-        rawContent = rawContent.trim();
+        rawContent = StringUtils.normalizeSpace(rawContent);
+        log.info(rawContent);
         if (rawContent.endsWith("NEWONLY")) {
             this.newOnly = true;
             log.info("Rule Type: new only");
+            rawContent = rawContent.substring(0, rawContent.length() - 7);
+        }
+
+        if (rawContent.endsWith("PRECISE")) {
+            this.precise = true;
+            log.info("Rule Type: precise");
             rawContent = rawContent.substring(0, rawContent.length() - 7);
         }
         Matcher functionNameMatcher = Pattern.compile("EXECUTE?\\((.*?)\\)").matcher(rawContent);
@@ -141,16 +174,8 @@ public class ExecuteRule extends AbstractRule {
         }
         this.functionName = functionName;
 
-        // find arguments
-        Matcher argumentMatcher = Pattern.compile(functionName + "?\\)(.*?)[\\nF]").matcher(rawContent);
-        List<String> arguments = new ArrayList<>();
-        int i = 0;
-        while (argumentMatcher.find()) {
-            arguments.add(argumentMatcher.group(++i));
-        }
-
-        if (arguments.isEmpty()) {
-            arguments.add("dummy_arg");
+        // does the rule have arguments?
+        if (rawContent.contains(functionName + ") [R")) {
             this.argless = true;
         }
 
@@ -167,7 +192,7 @@ public class ExecuteRule extends AbstractRule {
             throw new ParseException("No step found!", 0);
         }
         log.info("FunctionName: " + functionName);
-        log.info("Arguments: " + arguments.toString());
+        // log.info("Arguments: " + arguments.toString());
         log.info("Step: " + step);
         this.executionStep = step * 1000;
         String fromStreamClause = "FROM STREAM <http://myexample.org/stream>";
@@ -176,7 +201,7 @@ public class ExecuteRule extends AbstractRule {
         if (!argless) {
             result += rawContent.replaceAll("EXECUTE?\\((.*?)\\)", "SELECT").replace("[", fromStreamClause + " [");
         } else {
-            log.info("argless");
+            log.info("Function doesn't have arguments, substituting dummy arg.");
             result += rawContent.replaceAll("EXECUTE?\\((.*?)\\)", "SELECT").replace("[",
                     " (\"asdf\" as ?dummy_arg) " + fromStreamClause + " [");
         }

@@ -44,6 +44,7 @@ dependencies {
   compile('eu.larkc.csparql:csparql-sparql-api:[0.9.7, 1.0)')
   compile('eu.larkc.csparql:csparql-sparql-jena:[0.9.7, 1.0)')
   compile('eu.larkc.csparql:csparql-sparql-api:[0.9.7, 1.0)')
+  compile 'org.apache.commons:commons-lang3:3.6'
   
   compile 'org.ros.rosjava_core:rosjava:[0.3,0.4)'
   
