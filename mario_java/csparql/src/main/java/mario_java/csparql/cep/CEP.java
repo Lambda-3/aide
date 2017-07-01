@@ -9,7 +9,7 @@ import eu.larkc.csparql.cep.api.RdfStream;
 import eu.larkc.csparql.core.engine.CsparqlEngine;
 import eu.larkc.csparql.core.engine.CsparqlEngineImpl;
 
-public class CEP extends CsparqlEngineImpl implements CsparqlEngine {
+public class CEP extends CsparqlEngineImpl {
     private final Log log = LogFactory.getLog(CEP.class);
     private API api;
     private OutStream out;
