@@ -109,8 +109,8 @@ class ActionHandler:
             new_kwargs = dict()
             for k, v in kwargs.items():
                 loginfo("Argument: {} = {}".format(k, v))
-                if isinstance(v, str) and v.startswith("eval:"):
-                    v = v[5:]
+                if isinstance(v, str) or isinstance(v, unicode) and v.startswith("eval:"):
+                    v = str(v[5:])
                     loginfo("Trying to eval: apis." + v)
                     result = eval("apis." + v)
                     new_kwargs[k] = result

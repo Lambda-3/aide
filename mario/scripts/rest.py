@@ -3,12 +3,11 @@ import threading
 import roslib
 import rospy
 from mario_messages.srv._AddApi import AddApi
-from mario_messages.srv._GetExtractor import GetExtractor
 
 import config
 from mario_messages.srv import (GetSemRelatedFunctions, AddFunction, GetAllFunctions, GetFunction, AddRule, GetAllRules,
                                 GetRule, GetApi, GetAllApis, GetActionProvider, GetAllActionProviders,
-                                AddActionProvider, AddExtractor, GetAllExtractors)
+                                AddActionProvider, AddExtractor, GetAllExtractors, GetExtractor)
 from rdflib.term import URIRef
 
 from sparql_completer import QueryCompleter
