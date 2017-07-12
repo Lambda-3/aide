@@ -23,7 +23,7 @@ import eu.larkc.csparql.core.engine.CsparqlQueryResultProxy;
 import org.apache.commons.lang3.StringUtils;
 
 public class ExecuteRule extends AbstractRule {
-    private String functionName;
+    private String name;
     private static final Log log = LogFactory.getLog(ExecuteRule.class);
     private static final TypeMapper typeMapper = TypeMapper.getInstance();
     private API api;
@@ -133,9 +133,9 @@ public class ExecuteRule extends AbstractRule {
             }
             // convert args to json
             String args = gson.toJson(dict);
-            log.info(String.format("Function name: %s, args: %s", this.functionName, args));
+            log.info(String.format("Function name: %s, args: %s", this.name, args));
 
-            this.api.call(this.functionName, args);
+            this.api.call(this.name, args);
         }
 
     }
@@ -149,9 +149,11 @@ public class ExecuteRule extends AbstractRule {
 
     }
 
-    protected String parseContent(String rawContent) throws ParseException {
+    protected String parseContent(String name, String rawContent) throws ParseException {
         rawContent = StringUtils.normalizeSpace(rawContent);
-        log.info(rawContent);
+        this.name = name;
+
+        // TODO: DUE TO CHANGE, EXECUTION TYPE SHENNANIGANS
         if (rawContent.endsWith("NEWONLY")) {
             this.newOnly = true;
             log.info("Rule Type: new only");
@@ -163,24 +165,15 @@ public class ExecuteRule extends AbstractRule {
             log.info("Rule Type: precise");
             rawContent = rawContent.substring(0, rawContent.length() - 7);
         }
-        Matcher functionNameMatcher = Pattern.compile("EXECUTE?\\((.*?)\\)").matcher(rawContent);
-        String functionName;
-
-        // find function name
-        if (functionNameMatcher.find()) {
-            functionName = functionNameMatcher.group(1);
-        } else {
-            throw new ParseException("No function name found!", 0);
-        }
-        this.functionName = functionName;
 
         // does the rule have arguments?
-        if (rawContent.contains(functionName + ") [R")) {
+        if (rawContent.startsWith("SELECT [")) {
             this.argless = true;
         }
 
-        Matcher stepMatcher = Pattern.compile("STEP ?(.*?)s").matcher(rawContent);
+        Matcher stepMatcher = Pattern.compile("STEP?(.*?)s").matcher(rawContent);
         int step;
+
         if (stepMatcher.find()) {
             String stringStep = stepMatcher.group(1);
             if (StringUtils.isNumeric(stringStep)) {
@@ -191,8 +184,8 @@ public class ExecuteRule extends AbstractRule {
         } else {
             throw new ParseException("No step found!", 0);
         }
-        log.info("FunctionName: " + functionName);
-        // log.info("Arguments: " + arguments.toString());
+
+        log.info("FunctionName: " + name);
         log.info("Step: " + step);
         this.executionStep = step * 1000;
         String fromStreamClause = "FROM STREAM <http://myexample.org/stream>";
@@ -203,11 +196,77 @@ public class ExecuteRule extends AbstractRule {
         } else {
             log.info("Function doesn't have arguments, substituting dummy arg.");
             result += rawContent.replaceAll("EXECUTE?\\((.*?)\\)", "SELECT").replace("[",
-                    " (\"asdf\" as ?dummy_arg) " + fromStreamClause + " [");
+                    " (\"dummy\" as ?dummy_arg) " + fromStreamClause + " [");
         }
 
         log.info("Constructed Query: " + result);
         return result;
     }
+
+    // protected String parseContent(String rawContent) throws ParseException {
+    // rawContent = StringUtils.normalizeSpace(rawContent);
+    // log.info(rawContent);
+    // if (rawContent.endsWith("NEWONLY")) {
+    // this.newOnly = true;
+    // log.info("Rule Type: new only");
+    // rawContent = rawContent.substring(0, rawContent.length() - 7);
+    // }
+    //
+    // if (rawContent.endsWith("PRECISE")) {
+    // this.precise = true;
+    // log.info("Rule Type: precise");
+    // rawContent = rawContent.substring(0, rawContent.length() - 7);
+    // }
+    // Matcher functionNameMatcher =
+    // Pattern.compile("EXECUTE?\\((.*?)\\)").matcher(rawContent);
+    // String functionName;
+    //
+    // // find function name
+    // if (functionNameMatcher.find()) {
+    // functionName = functionNameMatcher.group(1);
+    // } else {
+    // throw new ParseException("No function name found!", 0);
+    // }
+    // this.functionName = functionName;
+    //
+    // // does the rule have arguments?
+    // if (rawContent.contains(functionName + ") [R")) {
+    // this.argless = true;
+    // }
+    //
+    // Matcher stepMatcher = Pattern.compile("STEP
+    // ?(.*?)s").matcher(rawContent);
+    // int step;
+    // if (stepMatcher.find()) {
+    // String stringStep = stepMatcher.group(1);
+    // if (StringUtils.isNumeric(stringStep)) {
+    // step = Integer.parseInt(stringStep);
+    // } else {
+    // throw new ParseException("Step not numeric!", 0);
+    // }
+    // } else {
+    // throw new ParseException("No step found!", 0);
+    // }
+    // log.info("FunctionName: " + functionName);
+    // // log.info("Arguments: " + arguments.toString());
+    // log.info("Step: " + step);
+    // this.executionStep = step * 1000;
+    // String fromStreamClause = "FROM STREAM <http://myexample.org/stream>";
+    // // assemble query
+    // String result = "REGISTER QUERY " + this.getName() + " as " +
+    // AbstractRule.KNOWN_PREFIXES;
+    // if (!argless) {
+    // result += rawContent.replaceAll("EXECUTE?\\((.*?)\\)",
+    // "SELECT").replace("[", fromStreamClause + " [");
+    // } else {
+    // log.info("Function doesn't have arguments, substituting dummy arg.");
+    // result += rawContent.replaceAll("EXECUTE?\\((.*?)\\)",
+    // "SELECT").replace("[",
+    // " (\"asdf\" as ?dummy_arg) " + fromStreamClause + " [");
+    // }
+    //
+    // log.info("Constructed Query: " + result);
+    // return result;
+    // }
 
 }

@@ -30,10 +30,10 @@ public abstract class AbstractRule implements Observer {
         log.info("Creating Rule...");
         log.info("Content is: " + content);
         this.name = name;
-        this.content = this.parseContent(content);
+        this.content = this.parseContent(name, content);
     }
 
-    protected abstract String parseContent(String rawContent) throws ParseException;
+    protected abstract String parseContent(String name, String rawContent) throws ParseException;
 
     protected abstract void addMe(CEP cep) throws ParseException;
 

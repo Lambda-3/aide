@@ -19,7 +19,9 @@ package mario_java.csparql.ros;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.logging.Log;
 import org.ros.exception.RemoteException;
 import org.ros.exception.RosRuntimeException;
@@ -36,13 +38,19 @@ import org.ros.node.service.ServiceResponseListener;
 import org.ros.node.topic.Publisher;
 import org.ros.node.topic.Subscriber;
 
+import com.google.gson.Gson;
+
 import eu.larkc.csparql.cep.api.RdfQuadruple;
 import eu.larkc.csparql.cep.api.RdfStream;
 import eu.larkc.csparql.common.RDFTuple;
 import mario_java.csparql.cep.API;
 
 import mario_java.csparql.cep.CEP;
-import mario_java.csparql.cep.OutStream;
+import mario_java.csparql.cep.Event;
+import mario_java.csparql.cep.EventStream;
+import mario_java.csparql.cep.exstrat.ExecutionStrategyType;
+import mario_messages.AddEventRequest;
+import mario_messages.AddEventResponse;
 import mario_messages.AddRuleRequest;
 import mario_messages.AddRuleResponse;
 import mario_messages.CallFunction;
@@ -86,12 +94,12 @@ public class RosCEPNode extends AbstractNodeMain {
 
         this.registerStreamListener();
 
-        this.registerAddRule();
-
-        OutStream outStream = this.registerOutStream();
+        // this.registerAddRule();
+        this.registerAddEvent();
+        // EventStream outStream = this.registerOutStream();
         RdfStream inStream = this.registerStreamListener();
 
-        this.cep = new CEP(api, outStream);
+        this.cep = new CEP(api);
         this.cep.addStream(inStream);
 
     }
@@ -124,25 +132,55 @@ public class RosCEPNode extends AbstractNodeMain {
                 });
     }
 
-    private OutStream registerOutStream() {
-        return new OutStream() {
-            private Publisher<RdfGraphStamped> publisher = connectedNode.newPublisher("mario/rdf",
-                    RdfGraphStamped._TYPE);
+    private void registerAddEvent() {
+        connectedNode.newServiceServer("mario/add_event", mario_messages.AddEvent._TYPE,
+                new ServiceResponseBuilder<mario_messages.AddEventRequest, mario_messages.AddEventResponse>() {
+
+                    @Override
+                    public void build(AddEventRequest request, AddEventResponse response) throws ServiceException {
+                        try {
+                            boolean success = cep.registerEvent(new Event(request.getName(), request.getParams(),
+                                    request.getRange(), request.getStep(),
+                                    getExecutionStrategyFromRosConstant(request.getExecutionType()),
+                                    request.getSparqlWhere(), RosCEPNode.this.registerOutStream()));
+                            log.info("Rule successfully added!");
+                            response.setSuccess(success);
+                        } catch (ParseException e) {
+                            log.info("Parse Error!");
+                            response.setSuccess(false);
+                            throw new ServiceException(e);
+                        }
+
+                    }
+                });
+    }
+
+    private ExecutionStrategyType getExecutionStrategyFromRosConstant(int constant) {
+        switch (constant) {
+        case 0:
+            return ExecutionStrategyType.Continuous;
+        case 1:
+            return ExecutionStrategyType.NewOnly;
+        case 2:
+            return ExecutionStrategyType.Precise;
+        default:
+            throw new NotImplementedException("No corresponding Execution type for defined strategy.");
+        }
+    }
+
+    private EventStream registerOutStream() {
+        return new EventStream() {
+            private Publisher<mario_messages.Event> publisher = connectedNode.newPublisher("mario/events",
+                    mario_messages.Event._TYPE);
 
             @Override
-            public void put(List<RDFTuple> triples) {
-                RdfGraphStamped msg = publisher.newMessage();
-                List<RdfTripleStamped> stampedTriples = msg.getQuadruples();
-                for (RDFTuple triple : triples) {
-                    RdfTripleStamped stampedTriple = connectedNode.getTopicMessageFactory()
-                            .newFromType(RdfTripleStamped._TYPE);
-                    stampedTriple.setSubject(triple.get(0));
-                    stampedTriple.setPredicate(triple.get(1));
-                    stampedTriple.setSubject(triple.get(2));
-                    stampedTriple.setStamp(connectedNode.getCurrentTime());
-                    stampedTriples.add(stampedTriple);
-                }
-                msg.setQuadruples(stampedTriples);
+            public void put(Event event, Map<String, Object> params) {
+                mario_messages.Event msg = publisher.newMessage();
+                msg.setName(event.getName());
+
+                Gson json = new Gson();
+
+                msg.setParams(json.toJson(params));
 
                 publisher.publish(msg);
             }
