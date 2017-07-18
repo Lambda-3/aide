@@ -24,6 +24,7 @@ import mario_java.csparql.cep.exstrat.ExecutionStrategyType;
 
 public class Event implements Observer {
 
+    private static final String DUMMY_ARG_NAME = "dummy_arg";
     private static final String RANGE = " [RANGE %ds STEP %ds] ";
     private static final String FROM_STREAM = " FROM STREAM <http://myexample.org/stream> ";
     private static final String SELECT = " SELECT ";
@@ -93,7 +94,7 @@ public class Event implements Observer {
             }
         } else {
             this.log.info("...no parameters, appending dummy argument...");
-            result.append(" (\"dummy\" as ?dummy_arg) ");
+            result.append(String.format(" (\"dummy\" as ?%s) ", DUMMY_ARG_NAME));
         }
         result.append(FROM_STREAM);
         result.append(String.format(RANGE, this.range, this.step));
@@ -112,7 +113,7 @@ public class Event implements Observer {
         this.log.info(queryResult.size());
         for (final RDFTuple row : queryResult) {
             if (type.isEligibleForExecution(row)) {
-                
+
                 this.out.put(this, this.rowAsMap(row, queryResult.getNames()));
             }
         }
@@ -120,12 +121,17 @@ public class Event implements Observer {
 
     private Map<String, Object> rowAsMap(RDFTuple row, Collection<String> names) {
         LinkedHashMap<String, Object> result = new LinkedHashMap<>();
+        // if only dummy name in result table, then event is not parametrized
+        if (names.size() == 1 && names.contains(DUMMY_ARG_NAME)) {
+            return result;
+        }
+        // if not, proceed
         int i = 0;
         for (String name : names) {
 
             String param = row.get(i);
-            Object parsedParam = null;
 
+            Object parsedParam = null;
             // split into argument value and type
             // argumentParts[0] is value argumentParts[1] is type.
             String[] paramParts = param.split("\\^\\^");
@@ -155,6 +161,7 @@ public class Event implements Observer {
                 parsedParam = param.toString();
             }
             result.put(name, parsedParam);
+
             ++i;
         }
         return result;
@@ -165,5 +172,21 @@ public class Event implements Observer {
         return String.format("%s(params=%s, range=%d, step=%d executionType=%s, sparqlWhere=%s)", name,
                 params.toString(), range, step, type, sparqlWhere);
 
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        log.info("Comparing " + this + "and " + obj);
+        if (obj instanceof Event) {
+            return this.name.equals(((Event) obj).name);
+        } else {
+            return false;
+        }
+
+    }
+
+    @Override
+    public int hashCode() {
+        return this.name.hashCode();
     }
 }

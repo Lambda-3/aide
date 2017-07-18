@@ -6,15 +6,22 @@ import eu.larkc.csparql.common.RDFTuple;
 import mario_java.csparql.cep.Event;
 
 public abstract class ExecutionStrategy {
-    
+
     public abstract boolean isEligibleForExecution(RDFTuple row);
 
     public static ExecutionStrategy getStrategyFromType(ExecutionStrategyType type, Event event) {
         Class<? extends ExecutionStrategy> cls = type.getCorrespondingClass();
         try {
             return cls.getDeclaredConstructor(Event.class).newInstance(event);
+        } catch (NoSuchMethodException e) {
+            try {
+                return cls.newInstance();
+            } catch (InstantiationException | IllegalAccessException e1) {
+                e.printStackTrace();
+                throw new RuntimeException("Something somewhere went terribly wrong");
+            }
         } catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
-                | NoSuchMethodException | SecurityException e) {
+                | SecurityException e) {
             e.printStackTrace();
             throw new RuntimeException("Something somewhere went terribly wrong");
         }

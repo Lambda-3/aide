@@ -46,13 +46,15 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
+  Event.msg
+  FiredEvent.msg
   Function.msg
   Person.msg
   RdfGraph.msg
   RdfGraphStamped.msg
   RdfTriple.msg
   RdfTripleStamped.msg
-  Rule.msg
+  Routine.msg
   Skeleton.msg
 )
 
@@ -61,6 +63,7 @@ add_service_files(
   FILES
   AddActionProvider.srv
   AddApi.srv
+  AddEvent.srv
   AddExtractor.srv
   AddFunction.srv
   AddRule.srv
@@ -69,13 +72,15 @@ add_service_files(
   GetActionProvider.srv
   GetAllActionProviders.srv
   GetAllApis.srv
+  GetAllEvents.srv
   GetAllExtractors.srv
   GetAllFunctions.srv
-  GetAllRules.srv
+  GetAllRoutines.srv
   GetApi.srv
+  GetEvent.srv
   GetExtractor.srv
   GetFunction.srv
-  GetRule.srv
+  GetRoutine.srv
   GetSemRelatedFunctions.srv
   ResetTrackFace.srv
   TrackFace.srv
