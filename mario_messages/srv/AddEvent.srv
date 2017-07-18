@@ -1,11 +1,3 @@
-uint8 CONTINUOUS=0
-uint8 NEWONLY=1
-uint8 PRECISE=2
-string name
-string[] params
-uint8 range
-uint8 step
-uint8 executionType
-string sparqlWhere
+Event event
 ---
 bool success
