@@ -1,27 +1,19 @@
-import re
+import pymongo
 import rospy
 import mario_messages.srv as services
 
 from rospy import loginfo, logdebug
-
+from util import camel_case_to_underscore as cc_to_underscore
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message as dtr
 
-service_handlers = {}
-
-first_cap_re = re.compile('(.)([A-Z][a-z]+)')
-all_cap_re = re.compile('([a-z0-9])([A-Z])')
-
-
-def cc_to_underscore(name):
-    s1 = first_cap_re.sub(r'\1_\2', name)
-    return all_cap_re.sub(r'\1_\2', s1).lower()
+service_handlers = dict()
 
 
 def get_service_handler(name):
     """
 
     :type name: str, object
-    :returns ServiceHandler
+    :rtype: ServiceHandler
     """
     if not isinstance(name, str):
         name = name.__name__
@@ -29,6 +21,14 @@ def get_service_handler(name):
         return service_handlers[name]
     except KeyError:
         raise ValueError("Service with name {} is not implemented!".format(name))
+
+
+def get_slots(msg, response=False):
+    try:
+        # if msg is a service, check the request class of that service
+        return msg._request_class.__slots__ if not response else msg._response_class.__slots__
+    except AttributeError:
+        return msg.__slots__
 
 
 class ServiceHandler:
@@ -57,8 +57,8 @@ class ServiceHandler:
     def register_service(self, callback):
         """
         
-        Registers the service with a callback function while wrapping the arguments and the return of the callback function into 
-        a response class object.
+        Registers the service with a callback function while wrapping the arguments and the return of the callback
+        function into a response class object.
         
         This way, dicts also can be used as return types.
         
@@ -111,6 +111,14 @@ class ServiceHandler:
                                 isinstance(result_in_slot[0],
                                            services.genpy.Message) and result_in_slot[0]._type == slot_type[:-2]):
                         response[slot_name] = result_in_slot
+                    # this means the list is actually a pymongo cursor
+                    elif isinstance(result_in_slot[0], pymongo.cursor.Cursor):
+                        response_slot = []
+                        for entry in result_in_slot:
+                            # transform every dict to a message
+                            for row in entry:
+                                response_slot.append(dtr(slot_type[:-2], row))
+                        response[slot_name] = response_slot
                     else:
                         raise ValueError("{} is a list but neither a dict nor a Ros Message!".format(result_in_slot))
 
@@ -131,6 +139,10 @@ class ServiceHandler:
                 else:
                     raise ValueError("{} is neither a dict nor a Ros Message!".format(result_in_slot))
             loginfo("Returning: {} of type {}".format(response, type(response)))
+            try:
+                print(type(response['routines'][0].name))
+            except:
+                pass
             return response
 
         return rospy.Service(self.SERVICE_CHANNEL, self.service_class, improved_callback)
@@ -147,6 +159,12 @@ class ServiceHandler:
         return rospy.ServiceProxy(self.SERVICE_CHANNEL, self.service_class)
 
     def call_service(self, **kwargs):
+        """
+        Calls the service.
+        
+        :param kwargs: Arguments of the service.
+        :return: Result of the service call.
+        """
         rospy.wait_for_service(self.SERVICE_CHANNEL)
         return rospy.ServiceProxy(self.SERVICE_CHANNEL, self.service_class)(**kwargs)
 
