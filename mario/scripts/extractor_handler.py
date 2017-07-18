@@ -1,7 +1,9 @@
 #!/usr/bin/env python2
 
-import rospy
 import roslib
+import rospy
+from mario_messages.srv import GetAllExtractors, AddExtractor
+from mario_messages.srv._GetExtractor import GetExtractor
 from rospy.core import logerror
 
 roslib.load_manifest("mario")
@@ -10,13 +12,13 @@ import os
 import traceback
 import reimport
 import re
+import imp
 
 from mario_messages.msg import RdfGraphStamped
-from rospy import loginfo, logdebug
+from rospy import loginfo
 from std_msgs.msg import Bool, String
-import imp
 import config
-from ros_services import cc_to_underscore
+from apis.ros_services import cc_to_underscore, get_service_handler
 
 excluded = ["speech_extractor.py"]
 
@@ -41,6 +43,18 @@ class ExtractorHandler(object):
             if not module == "__main__":
                 loginfo("Module {} changed. reloading...".format(module))
                 reimport.reimport(module)
+
+    def get_extractor(self, name):
+        try:
+            with open("{}/{}.py".format(config.EXTRACTORS_PATH, name), "r") as f:
+                file_content = f.read()
+            return file_content
+        except IOError as e:
+            if "No such file or directory" in e:
+                loginfo(e.message)
+                return None
+            else:
+                raise IOError(e)
 
     def register_extractor(self, ExtractorClass):
         """
@@ -86,6 +100,9 @@ class ExtractorHandler(object):
         loginfo("   ...registered!")
         return (True, "")
 
+    def get_all_extractors(self):
+        return [api_path.rsplit("/", 1)[-1].rsplit(".py", 1)[-2] for api_path in self.get_all_extractor_files()]
+
     def get_all_extractor_files(self):
         """
 
@@ -106,9 +123,14 @@ if __name__ == '__main__':
 
     loginfo("Creating extractor handler...")
     extractor_handler = ExtractorHandler()
-    rospy.Subscriber("/mario/update_apis", Bool, lambda x: extractor_handler.reload_api_references() if x.data else ())
     loginfo("Registering services...")
-    # TODO: add / get / getAll
+
+    rospy.Subscriber("/mario/update_apis", Bool, lambda x: extractor_handler.reload_api_references() if x.data else ())
+
+    get_service_handler(GetExtractor).register_service(lambda name: extractor_handler.get_extractor(name) or ())
+    get_service_handler(GetAllExtractors).register_service(extractor_handler.get_all_extractors)
+    get_service_handler(AddExtractor).register_service(extractor_handler.add_extractor)
+
     loginfo("Registered services. Spinning.")
 
     rospy.spin()

@@ -1,10 +1,9 @@
 import rospy
 import tf
-from mario_messages.msg import RdfGraphStamped, RdfTripleStamped
-from rospy import loginfo
+
 from tf2_msgs.msg._TFMessage import TFMessage
 
-from apis.rdf_utils import literalize, Graph, Triple, mario, properties
+from apis.rdf_utils import Graph, Triple, mario, properties
 from extractors import AbstractExtractor
 
 

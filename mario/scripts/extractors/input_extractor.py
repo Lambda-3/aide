@@ -21,7 +21,6 @@ class InputExtractor(AbstractTopicExtractor):
         command_id = mario[uuid().hex]
         if len(split_args) == 1:
             return Graph(Triple(command_id, properties.command, command))
-        args = split_args[1]
-        if len(split_args) == 2: args = [args]
+        args = split_args[1:]
         return Graph(Triple(command_id, properties.command, command),
                      *(Triple(command_id, properties["arg{}".format(i)], arg) for i, arg in enumerate(args)))

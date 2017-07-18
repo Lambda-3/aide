@@ -8,5 +8,3 @@ def __update():
         for file_name in [f for f in file_names if not f.startswith("__") and f.endswith(".py")]:
             exec """import {0} as {0}""".format(file_name.rsplit(".", 1)[0])
 
-
-__update()

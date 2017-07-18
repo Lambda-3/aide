@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 import reimport as reimport
-import rospy
 import roslib
+import rospy
 from std_msgs.msg import Bool
+
+import apis
+import actions
+from apis import storage, util
 
 roslib.load_manifest("mario")
 from rospy.core import logerror
@@ -13,28 +17,23 @@ import inspect
 import json
 
 import os
-import imp
-import apis
 import traceback
 
-import requests
-import pymongo
-from bson import ObjectId
-
-from mario_messages.srv import CallFunction, GetSemRelatedFunctions
+from mario_messages.srv import (CallFunction, AddActionProvider, GetAllActionProviders, GetActionProvider)
 
 import config
 
-from ros_services import get_service_handler
+from apis.ros_services import get_service_handler
+
+apis.__update()
+actions.__update()
 
 
 class ActionHandler:
     def __init__(self):
-        self.db = pymongo.MongoClient().db
-        self.db.actions.create_index("name", unique=True)
-        self.actions_table = self.db.actions
+        self.function_storage = storage.get_collection('action_funcs')
+        self.api_storage = storage.get_collection("actions")
 
-        # for the time being just load out of the folder /apis folder
         action_provider_files = self.get_all_action_provider_files()
 
         for file_name in action_provider_files:
@@ -42,10 +41,6 @@ class ActionHandler:
                 loginfo("Working on: {}".format(file_name))
                 file_content = f.read()
             self.add_action_provider(f.name.rsplit("/", 1)[-1], file_content)
-
-    # def get_function(self, name):
-    #     result = self.actions_table.find_one({"name": name}, {"_id": False})
-    #     return result
 
     def get_action_provider(self, name):
         try:
@@ -66,7 +61,6 @@ class ActionHandler:
                 reimport.reimport(module)
 
     def add_action_provider(self, name, file_content):
-        # class_name = re.findall("class\s+(.*?)[\(,:]", file_content)[0]
         loginfo("Adding action provider %s" % name)
         if name.endswith(".py"):
             name = name[:-3]
@@ -93,12 +87,29 @@ class ActionHandler:
             logerror(traceback.format_exc())
             return (False, traceback.format_exc(1))
         loginfo("   {} imported!".format(imported_action_provider))
-        actions = [{"name": f[0], "doc": f[1].__doc__ or "", "api": name, "args": inspect.getargspec(f[1]).args}
-                   for f in [f for f in inspect.getmembers(imported_action_provider, predicate=inspect.isfunction) if
-                             f[1].__module__ == imported_action_provider.__name__]]
+
+        actions = [
+            {"name": f[0],
+             "doc" : util.get_doc(f[1]),
+             "api" : name,
+             "args": inspect.getargspec(f[1]).args}
+            for f in
+            [
+                f for f in inspect.getmembers(imported_action_provider, predicate=inspect.isfunction) if
+                f[1].__module__ == imported_action_provider.__name__
+            ]
+        ]
+
+        api = {"name": name, "doc": util.get_doc(imported_action_provider)}
+
         loginfo("   adding funcs: {}".format(actions))
-        self.actions_table.delete_many({"api": name})
-        self.actions_table.insert_many(actions)
+
+        self.function_storage.delete_many({"api": name})
+        self.api_storage.delete_many({"name": name})
+
+        self.function_storage.insert_many(actions)
+        self.api_storage.insert(api)
+
         loginfo("   setting: self.{} = {}".format(name, imported_action_provider))
         setattr(self, name, imported_action_provider)
         return (True, "")
@@ -123,7 +134,7 @@ class ActionHandler:
         except KeyError:
             raise ValueError("There is no function {} in api {}!".format(func, api))
 
-    def get_all_actions(self):
+    def get_all_actions_providers(self):
         return [action_provider_path.rsplit("/", 1)[-1].rsplit(".py", 1)[-2] for action_provider_path in
                 self.get_all_action_provider_files()]
 
@@ -139,51 +150,55 @@ class ActionHandler:
         loginfo(api_files)
         return api_files
 
-    def get_best_matches(self, name, top_k):
-
-        """
-
-        :rtype: list
-        """
-        # build pairs from given name and every func + their api in database. use id to later identify
-        pairs = [{"t1": name.replace("_", " "),
-                  "t2": "id={id} {api} {name}".format(id=row['_id'], name=row['name'].replace("_", " "),
-                                                      api=row['api'].rsplit("_")[0])}
-                 for row in self.actions_table.find({}, {"name": True, "api": True, "_id": True})]
-
-        data = {'corpus'       : 'wiki-2014',
-                'model'        : 'W2V',
-                'language'     : 'EN',
-                'scoreFunction': 'COSINE', 'pairs': pairs}
-
-        headers = {
-            'content-type': "application/json"
-        }
-
-        response = requests.request("POST", "http://localhost:8916/relatedness", data=json.dumps(data), headers=headers)
-
-        response.raise_for_status()
-
-        response = response.json()['pairs']
-
-        index = top_k if len(response) > top_k else len(response)
-
-        return [self.actions_table.find_one({"_id": ObjectId(rsp['t2'].split(" ", 1)[0].split("=")[1])},
-                                            {"_id": False})
-                for rsp in sorted(response, reverse=True)][:index]
+        # def get_best_matches(self, name, top_k):
+        #
+        #     """
+        #
+        #     :rtype: list
+        #     """
+        #     # build pairs from given name and every func + their api in database. use id to later identify
+        #     # pairs = [{"t1": name.replace("_", " "),
+        #     #           "t2": "id={id} {api} {name}".format(id=row['_id'], name=row['name'].replace("_", " "),
+        #     #                                               api=row['api'].rsplit("_")[0])}
+        #     #          for row in self.actions_table.find({}, {"name": True, "api": True, "_id": True})]
+        #     #
+        #     # data = {'corpus'       : 'wiki-2014',
+        #     #         'model'        : 'W2V',
+        #     #         'language'     : 'EN',
+        #     #         'scoreFunction': 'COSINE', 'pairs': pairs}
+        #     #
+        #     # headers = {
+        #     #     'content-type': "application/json"
+        #     # }
+        #     #
+        #     # response = requests.request("POST", "http://localhost:8916/relatedness", data=json.dumps(data), headers=headers)
+        #     #
+        #     # response.raise_for_status()
+        #     #
+        #     # response = response.json()['pairs']
+        #     #
+        #     # index = top_k if len(response) > top_k else len(response)
+        #     #
+        #     # return [self.actions_table.find_one({"_id": ObjectId(rsp['t2'].split(" ", 1)[0].split("=")[1])},
+        #     #                                     {"_id": False})
+        #     #         for rsp in sorted(response, reverse=True)][:index]
+        #     return self.function_storage.find_related(name, ["name", "api", "doc", "args"], "{api} {name}", top_k=top_k)
 
 
 def main():
-    rospy.init_node("apis")
+    rospy.init_node("actions")
     loginfo("Creating action handler...")
     action_handler = ActionHandler()
     loginfo("Registering services...")
 
     get_service_handler(CallFunction).register_service(
-        lambda func_name, kwargs: action_handler.call_func(func_name, **json.loads(
-            kwargs)))
-    get_service_handler(GetSemRelatedFunctions).register_service(action_handler.get_best_matches)
+        lambda func_name, kwargs: action_handler.call_func(func_name, **json.loads(kwargs))
+    )
     rospy.Subscriber("/mario/update_apis", Bool, lambda x: action_handler.reload_api_references() if x.data else ())
+
+    get_service_handler(GetActionProvider).register_service(lambda name: action_handler.get_action_provider(name) or ())
+    get_service_handler(GetAllActionProviders).register_service(action_handler.get_all_actions_providers())
+    get_service_handler(AddActionProvider).register_service(action_handler.add_action_provider)
 
     loginfo("Registered services. Spinning.")
 
