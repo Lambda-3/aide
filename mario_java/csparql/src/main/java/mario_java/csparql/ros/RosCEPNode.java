@@ -17,8 +17,6 @@
 package mario_java.csparql.ros;
 
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang.NotImplementedException;
@@ -42,7 +40,6 @@ import com.google.gson.Gson;
 
 import eu.larkc.csparql.cep.api.RdfQuadruple;
 import eu.larkc.csparql.cep.api.RdfStream;
-import eu.larkc.csparql.common.RDFTuple;
 import mario_java.csparql.cep.API;
 
 import mario_java.csparql.cep.CEP;
@@ -51,8 +48,6 @@ import mario_java.csparql.cep.EventStream;
 import mario_java.csparql.cep.exstrat.ExecutionStrategyType;
 import mario_messages.AddEventRequest;
 import mario_messages.AddEventResponse;
-import mario_messages.AddRuleRequest;
-import mario_messages.AddRuleResponse;
 import mario_messages.CallFunction;
 import mario_messages.CallFunctionRequest;
 import mario_messages.CallFunctionResponse;
@@ -67,6 +62,7 @@ public class RosCEPNode extends AbstractNodeMain {
     private Log log;
     private CEP cep;
     private boolean simulation = false;
+    private EventStream outStream;
 
     @Override
     public GraphName getDefaultNodeName() {
@@ -102,6 +98,8 @@ public class RosCEPNode extends AbstractNodeMain {
         this.cep = new CEP(api);
         this.cep.addStream(inStream);
 
+        this.outStream = registerOutStream();
+
     }
 
     private RdfStream registerStreamListener() {
@@ -112,25 +110,28 @@ public class RosCEPNode extends AbstractNodeMain {
         return stream;
     }
 
-    private void registerAddRule() {
-        connectedNode.newServiceServer("mario/add_rule", mario_messages.AddRule._TYPE,
-                new ServiceResponseBuilder<mario_messages.AddRuleRequest, mario_messages.AddRuleResponse>() {
-
-                    @Override
-                    public void build(AddRuleRequest request, AddRuleResponse response) throws ServiceException {
-                        try {
-                            boolean success = cep.registerRule(request.getRule().getName(),
-                                    request.getRule().getContent());
-                            log.info("Rule successfully added!");
-                            response.setSuccess(success);
-                        } catch (ParseException e) {
-                            log.info("Parse Error!");
-                            throw new ServiceException(e);
-                        }
-
-                    }
-                });
-    }
+    // private void registerAddRule() {
+    // connectedNode.newServiceServer("mario/add_rule",
+    // mario_messages.AddRule._TYPE,
+    // new ServiceResponseBuilder<mario_messages.AddRuleRequest,
+    // mario_messages.AddRuleResponse>() {
+    //
+    // @Override
+    // public void build(AddRuleRequest request, AddRuleResponse response)
+    // throws ServiceException {
+    // try {
+    // boolean success = cep.registerRule(request.getRule().getName(),
+    // request.getRule().getContent());
+    // log.info("Rule successfully added!");
+    // response.setSuccess(success);
+    // } catch (ParseException e) {
+    // log.info("Parse Error!");
+    // throw new ServiceException(e);
+    // }
+    //
+    // }
+    // });
+    // }
 
     private void registerAddEvent() {
         connectedNode.newServiceServer("mario/add_event", mario_messages.AddEvent._TYPE,
@@ -138,12 +139,13 @@ public class RosCEPNode extends AbstractNodeMain {
 
                     @Override
                     public void build(AddEventRequest request, AddEventResponse response) throws ServiceException {
+                        mario_messages.Event event = request.getEvent();
                         try {
-                            boolean success = cep.registerEvent(new Event(request.getName(), request.getParams(),
-                                    request.getRange(), request.getStep(),
-                                    getExecutionStrategyFromRosConstant(request.getExecutionType()),
-                                    request.getSparqlWhere(), RosCEPNode.this.registerOutStream()));
-                            log.info("Rule successfully added!");
+                            boolean success = cep.registerEvent(
+                                    new Event(event.getName(), event.getParams(), event.getRange(), event.getStep(),
+                                            getExecutionStrategyFromRosConstant(event.getExecutionType()),
+                                            event.getSparqlWhere(), RosCEPNode.this.outStream));
+                            log.info("Event successfully added!");
                             response.setSuccess(success);
                         } catch (ParseException e) {
                             log.info("Parse Error!");
@@ -170,12 +172,12 @@ public class RosCEPNode extends AbstractNodeMain {
 
     private EventStream registerOutStream() {
         return new EventStream() {
-            private Publisher<mario_messages.Event> publisher = connectedNode.newPublisher("mario/events",
-                    mario_messages.Event._TYPE);
+            private Publisher<mario_messages.FiredEvent> publisher = connectedNode.newPublisher("mario/events",
+                    mario_messages.FiredEvent._TYPE);
 
             @Override
             public void put(Event event, Map<String, Object> params) {
-                mario_messages.Event msg = publisher.newMessage();
+                mario_messages.FiredEvent msg = publisher.newMessage();
                 msg.setName(event.getName());
 
                 Gson json = new Gson();
