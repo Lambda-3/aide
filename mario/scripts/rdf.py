@@ -5,14 +5,12 @@ import roslib
 import rospy
 from rdflib.term import URIRef
 
-from sparql_completer import QueryCompleter
-
 roslib.load_manifest('mario')
 
 import config
 
-from rospy import loginfo, logdebug
-from ros_services import get_service_handler
+from rospy import loginfo
+from apis.ros_services import get_service_handler
 from mario_messages.srv import GetAllRules, GetRule, AddRule, CallFunction
 from mario_messages.msg import RdfTriple
 from rules import RuleHandler

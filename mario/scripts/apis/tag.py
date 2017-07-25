@@ -4,7 +4,6 @@ import json
 from rospy import loginfo
 
 import config
-
 _places = dict()
 
 

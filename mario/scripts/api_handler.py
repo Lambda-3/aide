@@ -1,12 +1,15 @@
 #!/usr/bin/env python
+
 import roslib
 import rospy
 from std_msgs.msg import Bool
-
+from pylint import epylint as lint
 from apis import storage, util
 
 roslib.load_manifest("mario")
+# don't remove this
 import imp
+
 import os
 import inspect
 import traceback
@@ -33,7 +36,7 @@ class ApiHandler:
             loginfo("Working on: {}".format(file_name))
             with open(file_name, "r") as f:
                 file_content = f.read()
-            self.add_api(f.name.rsplit("/", 1)[-1], file_content)
+            self.add_api(f.name.rsplit("/", 1)[-1], file_content, loading=True)
 
         self.notify_function = notify_function
 
@@ -49,37 +52,51 @@ class ApiHandler:
             else:
                 raise IOError(e)
 
-    def add_api(self, name, file_content):
+    def add_api(self, name, file_content, loading=False):
         loginfo("Adding api %s" % name)
+
         if name.endswith(".py"):
             name = name[:-3]
         file_name = name + ".py"
+
         loginfo("File name: ".format(file_name))
+
+        loginfo("   applying Pylint...")
+        lint_output = ""
+
         try:
             # todo maybe use lint
             loginfo("   compiling...")
             compile(file_content, file_name, "exec")
         except Exception as e:
-            return (False, traceback.format_exc(limit=0))
-
+            return False, traceback.format_exc(limit=0)
         loginfo("   compiled!")
+
         with open(config.APIS_PATH + "/" + file_name, "w+") as f:
             f.write(file_content)
 
+        if not loading:
+            options = """%s --msg-template='{path}({line:3d}:{column:2d}): [{obj}] {msg}' 
+                --disable=C,R,I""" % (config.APIS_PATH + "/" + file_name)
+            out, err = lint.py_run(options, return_std=True)
+            lint_output = "".join(err.readlines()) + "".join(out.readlines())
+            loginfo("lint says:")
+            loginfo(lint_output)
+
         try:
             loginfo("   importing...")
-            exec """import apis.{0} as {0}\nimp.reload({0})""".format(name)
-            # ApiClass = eval("{}.{}".format(api_name, class_name))
+            exec """import apis.{0} as {0}""".format(name)
             imported_api = eval(name)
+            imp.reload(imported_api)
         except Exception as e:
             logerror(traceback.format_exc())
-            return False, traceback.format_exc(limit=1)
+            return False, lint_output + traceback.format_exc(limit=1)
         loginfo("   imported!")
 
         api_funcs = [
             {
                 "name": f[0],
-                "doc" : f[1].__doc__ or "",
+                "doc" : util.get_doc(imported_api),
                 "api" : name,
                 "args": inspect.getargspec(f[1]).args
             }
@@ -97,27 +114,13 @@ class ApiHandler:
 
         loginfo("   Funcs deleted. Adding now.")
         self.function_storage.insert_many(api_funcs)
-        self.function_storage.insert(api)
+        self.api_storage.insert(api)
 
-        # setattr(self, api_name, ApiClass())
         try:
             self.notify_function()
         except AttributeError as e:
             logwarn("No notify function set. If you see this message on startup, all is fine.")
-        return True, ""
-
-    # def call_func(self, func_name, **kwargs):
-    #     api, func = func_name.rsplit(".", 1)
-    #     try:
-    #         new_kwargs = dict()
-    #         for k, v in kwargs.items():
-    #             try:
-    #                 new_kwargs[k] = eval("self." + v)
-    #             except:
-    #                 new_kwargs[k] = v
-    #         getattr(eval("self.{}".format(api)), func)(**new_kwargs)
-    #     except KeyError:
-    #         raise ValueError("There is no function {} in api {}!".format(func, api))
+        return True, lint_output
 
     def get_all_apis(self):
         return [api_path.rsplit("/", 1)[-1].rsplit(".py", 1)[-2] for api_path in self.get_all_api_files()]
@@ -132,40 +135,6 @@ class ApiHandler:
             api_files.extend([dirpath + "/" + x for x in file_names if x.endswith(".py") and not x.startswith(
                 "__")])
         return api_files
-
-    def get_best_matches(self, name, top_k):
-
-        """
-
-        :rtype: list
-        """
-        # build pairs from given name and every func + their api in database. use id to later identify
-        # pairs = [{"t1": name.replace("_", " "),
-        #           "t2": "id={id} {api} {name}".format(id=row['_id'], name=row['name'].replace("_", " "),
-        #                                               api=row['api'].rsplit("_")[0])}
-        #          for row in self.functions_api_table.find({}, {"name": True, "api": True, "_id": True})]
-        #
-        # data = {'corpus'       : 'wiki-2014',
-        #         'model'        : 'W2V',
-        #         'language'     : 'EN',
-        #         'scoreFunction': 'COSINE', 'pairs': pairs}
-        #
-        # headers = {
-        #     'content-type': "application/json"
-        # }
-        #
-        # response = requests.request("POST", "http://localhost:8916/relatedness", data=json.dumps(data), headers=headers)
-        #
-        # response.raise_for_status()
-        #
-        # response = response.json()['pairs']
-        #
-        # index = top_k if len(response) > top_k else len(response)
-        #
-        # return [self.functions_api_table.find_one({"_id": ObjectId(rsp['t2'].split(" ", 1)[0].split("=")[1])},
-        #                                           {"_id": False})
-        #         for rsp in sorted(response, reverse=True)][:index]
-        return self.storage.find_related(name, ["name", "api", "doc", "args"], "{api} {name}", top_k=top_k)
 
 
 def main():
@@ -183,6 +152,8 @@ def main():
 
     loginfo("Registered services. Spinning.")
 
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    loginfo(os.getcwd())
     rospy.spin()
 
 

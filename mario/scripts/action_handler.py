@@ -4,9 +4,10 @@ import roslib
 import rospy
 from std_msgs.msg import Bool
 
-import apis
+import apis.storage
+import apis.util
 import actions
-from apis import storage, util
+import imp
 
 roslib.load_manifest("mario")
 from rospy.core import logerror
@@ -31,8 +32,8 @@ actions.__update()
 
 class ActionHandler:
     def __init__(self):
-        self.function_storage = storage.get_collection('action_funcs')
-        self.api_storage = storage.get_collection("actions")
+        self.function_storage = apis.storage.get_collection('action_funcs')
+        self.api_storage = apis.storage.get_collection("actions")
 
         action_provider_files = self.get_all_action_provider_files()
 
@@ -87,10 +88,9 @@ class ActionHandler:
             logerror(traceback.format_exc())
             return (False, traceback.format_exc(1))
         loginfo("   {} imported!".format(imported_action_provider))
-
         actions = [
             {"name": f[0],
-             "doc" : util.get_doc(f[1]),
+             "doc" : apis.util.get_doc(f[1]),
              "api" : name,
              "args": inspect.getargspec(f[1]).args}
             for f in
@@ -100,7 +100,7 @@ class ActionHandler:
             ]
         ]
 
-        api = {"name": name, "doc": util.get_doc(imported_action_provider)}
+        api = {"name": name, "doc": apis.util.get_doc(imported_action_provider)}
 
         loginfo("   adding funcs: {}".format(actions))
 
@@ -150,39 +150,6 @@ class ActionHandler:
         loginfo(api_files)
         return api_files
 
-        # def get_best_matches(self, name, top_k):
-        #
-        #     """
-        #
-        #     :rtype: list
-        #     """
-        #     # build pairs from given name and every func + their api in database. use id to later identify
-        #     # pairs = [{"t1": name.replace("_", " "),
-        #     #           "t2": "id={id} {api} {name}".format(id=row['_id'], name=row['name'].replace("_", " "),
-        #     #                                               api=row['api'].rsplit("_")[0])}
-        #     #          for row in self.actions_table.find({}, {"name": True, "api": True, "_id": True})]
-        #     #
-        #     # data = {'corpus'       : 'wiki-2014',
-        #     #         'model'        : 'W2V',
-        #     #         'language'     : 'EN',
-        #     #         'scoreFunction': 'COSINE', 'pairs': pairs}
-        #     #
-        #     # headers = {
-        #     #     'content-type': "application/json"
-        #     # }
-        #     #
-        #     # response = requests.request("POST", "http://localhost:8916/relatedness", data=json.dumps(data), headers=headers)
-        #     #
-        #     # response.raise_for_status()
-        #     #
-        #     # response = response.json()['pairs']
-        #     #
-        #     # index = top_k if len(response) > top_k else len(response)
-        #     #
-        #     # return [self.actions_table.find_one({"_id": ObjectId(rsp['t2'].split(" ", 1)[0].split("=")[1])},
-        #     #                                     {"_id": False})
-        #     #         for rsp in sorted(response, reverse=True)][:index]
-        #     return self.function_storage.find_related(name, ["name", "api", "doc", "args"], "{api} {name}", top_k=top_k)
 
 
 def main():
@@ -197,7 +164,7 @@ def main():
     rospy.Subscriber("/mario/update_apis", Bool, lambda x: action_handler.reload_api_references() if x.data else ())
 
     get_service_handler(GetActionProvider).register_service(lambda name: action_handler.get_action_provider(name) or ())
-    get_service_handler(GetAllActionProviders).register_service(action_handler.get_all_actions_providers())
+    get_service_handler(GetAllActionProviders).register_service(action_handler.get_all_actions_providers)
     get_service_handler(AddActionProvider).register_service(action_handler.add_action_provider)
 
     loginfo("Registered services. Spinning.")

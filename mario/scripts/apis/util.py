@@ -14,6 +14,10 @@ def camel_case_to_space(name):
     return _all_cap_re.sub(r'\1 \2', s1).lower()
 
 
+def underscore_to_camel_case(name):
+    return "".join(map(lambda x: x.capitalize(), underscore_to_space(name).split(" ")))
+
+
 def underscore_to_space(name):
     """
 

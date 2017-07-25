@@ -1,7 +1,3 @@
-"""
-This is doc.
-Doc is pretty nicce amd good.
-"""
 import genpy
 import pymongo
 import inspect

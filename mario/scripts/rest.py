@@ -1,10 +1,10 @@
 #!/usr/bin/env python
+import json
 import threading
 
 import roslib
 import rospy
-from mario_messages.srv import (GetSemRelatedFunctions, AddRule, GetApi,
-                                GetAllApis, GetActionProvider, GetAllActionProviders,
+from mario_messages.srv import (AddRule, GetApi, GetAllApis, GetActionProvider, GetAllActionProviders,
                                 AddActionProvider, AddExtractor, GetAllExtractors, GetExtractor, GetAllRoutines,
                                 GetEvent, GetAllEvents)
 from mario_messages.srv._AddApi import AddApi
@@ -12,8 +12,10 @@ from mario_messages.srv._GetRoutine import GetRoutine
 from rdflib.term import URIRef
 
 import config
-from apis import storage
+from apis import approximate
+from apis.util import camel_case_to_underscore
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as to_dict
+from rospy_message_converter.message_converter import convert_dictionary_to_ros_message as to_ros_message
 from sparql_completer import QueryCompleter
 
 roslib.load_manifest("mario")
@@ -26,6 +28,7 @@ from enum import Enum
 
 from mario_messages.msg import Rule, Routine, Event
 from apis.ros_services import get_service_handler
+from yapf.yapflib.yapf_api import FormatCode as format_code
 
 
 # rdf_class_fields = {
@@ -64,10 +67,37 @@ def parse_api():
     return parser.parse_args()
 
 
-def parse_rule():
+def parse_code():
     parser = reqparse.RequestParser()
-    parser.add_argument('routine', required=True, type=Routine, help="Rule needs a name!", location="json")
-    parser.add_argument('events', required=False, type=[Event], default=[], location="json")
+    parser.add_argument('code', required=True, type=str,
+                        help="Code must not be empty!",
+                        location="json")
+
+    return parser.parse_args()
+
+
+def parse_rule():
+    def parse_routine(routine):
+        try:
+            msg = to_ros_message(Routine._type, routine)
+            print msg
+        except Exception as e:
+            print e
+        return msg or None
+
+    def parse_events(events):
+        parsed_events = []
+        for event in events:
+            parsed_events.append(to_ros_message(Event._type, event))
+        print parsed_events
+        return parsed_events
+
+    parser = reqparse.RequestParser()
+    parser.add_argument('routine', required=True,
+                        type=parse_routine,
+                        help="Need a routine!",
+                        location="json")
+    parser.add_argument('events', required=False, type=parse_events, default=[], location="json")
     return parser.parse_args()
 
 
@@ -151,14 +181,20 @@ class ResourceEnum(Enum):
         "get": get_service_handler(GetAllEvents).call_service
     }
 
+    Format = {
+        "post"          : lambda code: format_code(code)[0],
+        "validate_input": parse_code,
+        "envelope"      : "formatted_code"
+    }
+
     Rules = {
-        "post"          : lambda **args: get_service_handler(AddRule).call_service(rule=Rule(**args)),
+        "post"          : lambda **args: get_service_handler(AddRule).call_service(**args),
         "validate_input": parse_rule,
     }
 
     Related = {
-        "get"     : lambda type, name, top_k=3: storage.find_related(name, top_k=top_k, collection=type),
-        'path'    : "/mario/<string:type>/<string:name>/related/<int:top_k>",
+        "get"     : lambda **args: approximate.get_semantically_related(**args),
+        'path'    : "/mario/<string:type>/<string:to>/related/<int:top_k>",
         "envelope": "result"
     }
 
@@ -220,14 +256,48 @@ class ResourceEnum(Enum):
             return path if isinstance(path, tuple) else (path, path + "/") if not path.endswith("/") else (path,)
         else:
             # if no path value is defined, create a default path
-            name = self.name.lower()
+            name = camel_case_to_underscore(self.name)
             return ("/mario/{}".format(name), "/mario/{}/".format(name))
 
     def envelope(self):
-        return self.value["envelope"] if self.value.has_key("envelope") else None
+        # return self.value["envelope"] if self.value.has_key("envelope") else None
+        return self.value.get("envelope", None)
 
     def marshal_with(self):
         return self.value["marshal_with"] if self.value.has_key("marshal_with") else None
+
+
+def handle_result(result, rsc):
+    logdebug(result)
+    if result or result == []:
+        try:
+            return marshal(result, rsc.marshal_with(), rsc.envelope())
+        except AttributeError as e:
+            if "'NoneType' object has no attribute 'items'" in e.message:
+                loginfo(e)
+                try:
+                    result = to_dict(result)
+                    loginfo(result)
+                    return marshal(result, rsc.marshal_with(), rsc.envelope())
+                except AttributeError as e:
+                    if isinstance(result, dict):
+                        logdebug("result is already dict")
+                        return result
+                    else:
+                        loginfo(e.message)
+                        return {rsc.envelope(): result}
+
+            else:
+                raise AttributeError(e)
+
+
+def handle_exception(e):
+    if e.message.endswith("None"):
+        loginfo(e)
+        abort(404)
+    error = e.message.split("error processing request: ")[1]
+    loginfo("Unsuccessful, got following error: " + error)
+    abort(400, message=error)
 
 
 def build_resources(api):
@@ -257,16 +327,13 @@ def build_resources(api):
                 :param rsc: Never touch this! This is for early binding purposes only.
                 :return: 
                 """
-                args = rsc.validate_input()
-                loginfo("POST request on {} with args {}".format(self.__class__, str(args)))
+                kwargs = rsc.validate_input()
+                loginfo("POST request on {} with args {}".format(self.__class__, str(kwargs)))
                 try:
-                    result = rsc.post(**args)
-                    loginfo("Success, Result: {} of type {}".format(str(result), type(result)))
-                    return to_dict(result)
+                    result = rsc.post(**kwargs)
+                    return handle_result(result, rsc)
                 except rospy.ServiceException as e:
-                    error = e.message.split("error processing request: ")[1]
-                    loginfo("Unsuccessful, got following error: " + error)
-                    abort(400, message=error)
+                    handle_exception(e)
 
             class_dict["post"] = post
 
@@ -283,35 +350,12 @@ def build_resources(api):
                 :param kwargs: Keyword arguments, given through to the defined get function.
                 :return: 
                 """
+                loginfo("GET request on {} with args {}".format(self.__class__, str(kwargs)))
                 try:
-                    loginfo("GET request on {} with args {}".format(self.__class__, str(kwargs)))
                     result = rsc.get(*args, **kwargs)
-                    logdebug(result)
-                    if result or result == []:
-                        try:
-                            return marshal(result, rsc.marshal_with(), rsc.envelope())
-                        except AttributeError as e:
-                            if "'NoneType' object has no attribute 'items'" in e.message:
-                                loginfo(e)
-                                try:
-                                    return to_dict(result)
-                                except AttributeError as e:
-                                    if (e.message == """'dict' object has no attribute '__slots__'""" or
-                                                e.message == """'list' object has no attribute '__slots__'"""):
-                                        logdebug("result is already dict|list")
-                                        return result
-                                    else:
-                                        raise e
-
-                            else:
-                                raise AttributeError(e)
+                    return handle_result(result, rsc)
                 except rospy.ServiceException as e:
-                    if e.message.endswith("None"):
-                        loginfo(e)
-                        abort(404)
-                    error = e.message.split("error processing request: ")[1]
-                    loginfo("Unsuccessful, got following error: " + error)
-                    abort(400, message=error)
+                    handle_exception(e)
 
             class_dict["get"] = get
 
@@ -327,7 +371,7 @@ class RestApi:
     def __init__(self):
         loginfo("Creating RestApi instance.")
         self.app = Flask("Mario", static_url_path="")
-        self.api = Api(self.app)
+        self.api = Api(self.app, catch_all_404s=True)
         CORS(self.app)
         build_resources(self.api)
 

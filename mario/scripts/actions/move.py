@@ -17,6 +17,7 @@ def move(x, y):
     client.send_goal(goal)
     success = client.wait_for_result(rospy.Duration(60))
     loginfo(success)
+    
 
 
 def move_to_place(name):

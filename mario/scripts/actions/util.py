@@ -32,8 +32,8 @@ def dispatch_command(command):
 
 def print_all_args(**kwargs):
     loginfo("Printing all args")
-    for (k,v) in kwargs.items():
-        loginfo("\t name:{} - type: {} - value: {}".format(k,type(v), v))
+    for (k, v) in kwargs.items():
+        loginfo("\t name:{} - type: {} - value: {}".format(k, type(v), v))
 
 
 def add_to_stream(subject, predicate, object):

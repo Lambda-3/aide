@@ -25,7 +25,11 @@ register_event = get_service_handler(AddEvent).get_service()
 
 
 class Step(object):
-    pass
+    def __repr__(self):
+        return "{class_name}({attributes})".format(
+            class_name=self.__class__.__name__,
+            attributes=", ".join("{}={}".format(name, value) for name, value in self.__dict__.iteritems())
+        )
 
 
 class Execute(Step):
@@ -62,6 +66,8 @@ class WaitFor(Step):
 
 class RepeatUntil(Step):
     def __init__(self, wait_for, execute_steps, rate=1):
+        if not isinstance(execute_steps, list):
+            execute_steps = [execute_steps]
         self.execute_steps = execute_steps
         self.event_name = wait_for
         self.rate = rospy.Rate(rate)
@@ -78,6 +84,7 @@ class Routine(object):
         self.execution_steps = self.parse_steps(execution_steps)
         self.running = False
         self.waiting_for = None
+        self.waiting_event = None
         self.waiting_for_lock = threading.Lock()
         self.event_notifier = event_notifier
 
@@ -123,19 +130,31 @@ class Routine(object):
 
             if (isinstance(step, WaitFor)):
                 self.waiting_for = step.event_name
-                loginfo("Waiting for event {}...".format(step.event_name, str(self.params)))
+                loginfo("Waiting for event {}...".format(step.event_name))
                 self.event_notifier.add_to_waiting(self, self.waiting_for)
-                while self.waiting_for:
-                    rospy.Rate(2).sleep()
+                self.waiting_event = threading.Event()
+
+                while not self.waiting_event.is_set():
+                    self.waiting_event.wait()
+
+                self.event_notifier.remove_from_waiting(self, self.waiting_for)
+                self.waiting_for = None
+                loginfo("{} is done waiting.".format(self.name))
+                self.waiting_event = None
+
             if (isinstance(step, RepeatUntil)):
                 self.waiting_for = step.event_name
                 loginfo("Waiting for event {}...".format(step.event_name, str(self.params)))
                 self.event_notifier.add_to_waiting(self, self.waiting_for)
-                rate = step.rate
-                while self.waiting_for:
+                self.waiting_event = threading.Event()
+                while self.waiting_event.is_set():
                     for execute_step in step.execute_steps:
                         execute_step.execute()
-                        rate.sleep()
+
+                self.waiting_for = None
+                self.event_notifier.remove_from_waiting(self, self.waiting_for)
+                loginfo("{} is done waiting.".format(self.name))
+                self.waiting_event = None
 
         self.running = False
         loginfo("Routine {} is done.".format(self.name))
@@ -144,11 +163,10 @@ class Routine(object):
         with self.waiting_for_lock:
             if self.waiting_for == event.name:
                 loginfo("Routine is waiting for event {}".format(event.name))
+                # if params match, s.t. all params in event that are present in this routine are equal
                 if all(val == self.params[key] for key, val in event.params.iteritems() if key in self.params.keys()):
                     self.params.update(event.params)
-                    self.waiting_for = None
-                    self.event_notifier.remove_from_waiting(self, event.name)
-                    loginfo("{} is done waiting.".format(self.name))
+                    self.waiting_event.set()
                 else:
                     loginfo("Event parameters didn't match.")
 
@@ -179,10 +197,11 @@ class WaitingRoutinesHandler(object):
                 self.waiting_routines[event_name].append(routine)
             except KeyError:
                 self.waiting_routines[event_name] = [routine]
+            loginfo("Appended. Now it looks like this: {}".format(self.waiting_routines[event_name]))
 
     def remove_from_waiting(self, routine, event_name):
         with self.get_lock(event_name):
-            loginfo("Removing {} from waiting routines.".format(routine.name))
+            loginfo("Removing {} from routines waiting for {}.".format(routine.name, event_name))
             try:
                 self.waiting_routines[event_name].remove(routine)
             except ValueError:
@@ -215,14 +234,7 @@ class EventHandler(object):
         storage.get_collection(name="events", indices=["name"])
 
     def load_routines(self):
-        # TODO
         loginfo("Loading routines...")
-        # self.routines = [Routine("test_routine", "test", self.event_notifier,
-        #                          [Execute("util.print_arg", literals={"arg": 3}),
-        #                           RepeatUntil("test2", [Execute("util.print_arg", literals={"arg": 4})]
-        #                                       )
-        #                           ])
-        #                  ]
         loaded_routines = self.routine_storage.find(select_only=get_slots(mario_messages.msg.Routine))
         loginfo("...loaded routines!")
         loginfo("Appending Routines...")
@@ -266,6 +278,7 @@ class EventHandler(object):
 
         :type event: mario_messages.msg.Event
         """
+        event.sparqlWhere = "{{{}}}".format(event.sparqlWhere)
         self.event_storage.insert(entry=event)
         register_event(event)
 
@@ -275,7 +288,7 @@ class EventHandler(object):
         :type routine: mario_messages.msg.Routine
         """
         decoded_steps = [json.loads(step) for step in routine.execution_steps]
-        #routine.execution_steps = decoded_steps
+        # routine.execution_steps = decoded_steps
         loginfo("Adding routine {}..".format(routine.name))
         result = self.routine_storage.find_one(where={"name": routine.name})
         parsed_routine = Routine(event_notifier=self.event_notifier, **rtd(routine))

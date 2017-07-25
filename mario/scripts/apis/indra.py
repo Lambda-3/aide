@@ -1,13 +1,13 @@
 import json
 import requests
 
-from util import to_space
+from apis.util import to_space
 
 _data = {'corpus'       : 'wiki-2014',
          'model'        : 'W2V',
          'language'     : 'EN',
          'scoreFunction': 'COSINE'}
-
+#
 _headers = {
     'content-type': "application/json"
 }
