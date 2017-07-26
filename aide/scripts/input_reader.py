@@ -11,7 +11,7 @@ from std_msgs.msg import String
 
 import config
 
-roslib.load_manifest("mario")
+roslib.load_manifest("aide")
 
 
 class HistoryConsole(code.InteractiveConsole):
@@ -36,13 +36,13 @@ class HistoryConsole(code.InteractiveConsole):
 
 def main():
     rospy.init_node("input_reader")
-    pub = rospy.Publisher("/mario/console_input", String, queue_size=42)
+    pub = rospy.Publisher("/aide/console_input", String, queue_size=42)
     console = HistoryConsole()
     console.preprocess = lambda source: source[7:]
     atexit.register(loginfo, "Going down by user-input.")
     while not rospy.is_shutdown():
         try:
-            command = console.raw_input("mario> ")
+            command = console.raw_input("aide> ")
             pub.publish(command)
         except EOFError:
             print("")

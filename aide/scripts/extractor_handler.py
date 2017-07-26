@@ -2,11 +2,9 @@
 
 import roslib
 import rospy
-from mario_messages.srv import GetAllExtractors, AddExtractor
-from mario_messages.srv._GetExtractor import GetExtractor
+from aide_messages.srv import GetAllExtractors, AddExtractor
+from aide_messages.srv._GetExtractor import GetExtractor
 from rospy.core import logerror
-
-roslib.load_manifest("mario")
 
 import os
 import traceback
@@ -14,11 +12,13 @@ import reimport
 import re
 import imp
 
-from mario_messages.msg import RdfGraphStamped
+from aide_messages.msg import RdfGraphStamped
 from rospy import loginfo
 from std_msgs.msg import Bool, String
 import config
 from apis.ros_services import cc_to_underscore, get_service_handler
+
+roslib.load_manifest("aide")
 
 excluded = ["speech_extractor.py"]
 
@@ -62,7 +62,7 @@ class ExtractorHandler(object):
         :type ExtractorClass: AbstractExtractor
         """
         # name = ExtractorClass.__name__
-        publisher = rospy.Publisher("/mario/rdf", RdfGraphStamped, queue_size=ExtractorClass.queue_size)
+        publisher = rospy.Publisher("/aide/rdf", RdfGraphStamped, queue_size=ExtractorClass.queue_size)
 
         extractor = ExtractorClass(publisher=publisher)
 
@@ -119,13 +119,13 @@ class ExtractorHandler(object):
 if __name__ == '__main__':
     rospy.init_node("extractor")
 
-    publisher = rospy.Publisher("/mario/test_node", String, queue_size=50)
+    publisher = rospy.Publisher("/aide/test_node", String, queue_size=50)
 
     loginfo("Creating extractor handler...")
     extractor_handler = ExtractorHandler()
     loginfo("Registering services...")
 
-    rospy.Subscriber("/mario/update_apis", Bool, lambda x: extractor_handler.reload_api_references() if x.data else ())
+    rospy.Subscriber("/aide/update_apis", Bool, lambda x: extractor_handler.reload_api_references() if x.data else ())
 
     get_service_handler(GetExtractor).register_service(lambda name: extractor_handler.get_extractor(name) or ())
     get_service_handler(GetAllExtractors).register_service(extractor_handler.get_all_extractors)

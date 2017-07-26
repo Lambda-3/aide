@@ -1,13 +1,13 @@
 import rospy
-from mario_messages.msg import RdfTripleStamped, RdfGraphStamped
+from aide_messages.msg import RdfTripleStamped, RdfGraphStamped
 from rdflib import Literal, XSD, Namespace
 
 from rdflib.term import URIRef
 
 # namespaces TODO: do it more generically
-speech = Namespace("http://prokyon:5000/mario/speech/")
-properties = Namespace("http://prokyon:5000/mario/properties/")
-mario = Namespace("http://prokyon:5000/mario/")
+speech = Namespace("http://lambda3.org/aide/speech/")
+properties = Namespace("http://lambda3.org/aide/properties/")
+robot = Namespace("http://lambda3.org/self/")
 
 def Graph(*triples):
     return RdfGraphStamped(triples)

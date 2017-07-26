@@ -1,6 +1,6 @@
 import requests
 
-ENDPOINT = "https://api.icndb.com/jokes/random/?firstName=Mario&lastName=The%20Robot&limitTo=[nerdy]"
+ENDPOINT = "https://api.icndb.com/jokes/random/?firstName=My&lastName=Robot&limitTo=[nerdy]"
 
 
 def get_random_joke():

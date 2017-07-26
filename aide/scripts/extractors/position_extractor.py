@@ -3,7 +3,7 @@ import tf
 
 from tf2_msgs.msg._TFMessage import TFMessage
 
-from apis.rdf_utils import Graph, Triple, mario, properties
+from apis.rdf_utils import Graph, Triple, robot, properties
 from extractors import AbstractExtractor
 
 
@@ -25,7 +25,7 @@ class PositionExtractor(AbstractExtractor):
         time = self.get_time()
         try:
             ((x, y, z), rot) = self.listener.lookupTransform(self.MAP_LINK, self.ROBOT_LINK, rospy.Time(0))
-            return Graph(Triple(mario.self, properties.position_x, x, time),
-                         Triple(mario.self, properties.position_y, y, time))
+            return Graph(Triple(robot.self, properties.position_x, x, time),
+                         Triple(robot.self, properties.position_y, y, time))
         except:
             return None

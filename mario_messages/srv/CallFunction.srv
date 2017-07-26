@@ -1,3 +1,0 @@
-string func_name
-string kwargs # Keyword Arguments, encoded as a json string
----

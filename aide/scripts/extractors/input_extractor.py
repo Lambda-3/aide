@@ -1,6 +1,6 @@
 from rospy import loginfo
 
-from apis.rdf_utils import Graph, Triple, mario, properties
+from apis.rdf_utils import Graph, Triple, robot, properties
 from extractors import AbstractTopicExtractor
 from uuid import uuid4 as uuid
 from std_msgs.msg import String
@@ -18,7 +18,7 @@ class InputExtractor(AbstractTopicExtractor):
     def extract(self):
         split_args = self.message.data.split(" ")
         command = split_args[0]
-        command_id = mario[uuid().hex]
+        command_id = robot[uuid().hex]
         if len(split_args) == 1:
             return Graph(Triple(command_id, properties.command, command))
         args = split_args[1:]

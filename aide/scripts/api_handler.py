@@ -2,27 +2,24 @@
 
 import roslib
 import rospy
-from std_msgs.msg import Bool
-from pylint import epylint as lint
-from apis import storage, util
-
-roslib.load_manifest("mario")
-# don't remove this
 import imp
-
+import config
 import os
 import inspect
 import traceback
-from mario_messages.srv._GetApi import GetApi
-from rospy.core import logerror, logwarn
 
-from mario_messages.srv import AddApi, GetAllApis
+from pylint import epylint as lint
 
-import config
-
+from apis import storage, util
 from apis.ros_services import get_service_handler
 
 from rospy import loginfo
+from rospy.core import logerror, logwarn
+
+from std_msgs.msg import Bool
+from aide_messages.srv import AddApi, GetAllApis, GetApi
+
+roslib.load_manifest("aide")
 
 
 class ApiHandler:
@@ -96,8 +93,8 @@ class ApiHandler:
         api_funcs = [
             {
                 "name": f[0],
-                "doc" : util.get_doc(imported_api),
-                "api" : name,
+                "doc": util.get_doc(imported_api),
+                "api": name,
                 "args": inspect.getargspec(f[1]).args
             }
             for f in
@@ -140,12 +137,11 @@ class ApiHandler:
 def main():
     rospy.init_node("api_handler")
     loginfo("Creating api handler...")
-    notify_publisher = rospy.Publisher("/mario/update_apis", Bool, queue_size=50)
+    notify_publisher = rospy.Publisher("/aide/update_apis", Bool, queue_size=50)
 
     api = ApiHandler(lambda: notify_publisher.publish(True))
     loginfo("Registering services...")
 
-    # get_service_handler(GetSemRelatedFunctions).register_service(api.get_best_matches)
     get_service_handler(GetApi).register_service(lambda **args: api.get_api(**args) or ())
     get_service_handler(GetAllApis).register_service(api.get_all_apis)
     get_service_handler(AddApi).register_service(api.add_api)

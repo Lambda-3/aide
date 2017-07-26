@@ -1,25 +1,24 @@
 #!/usr/bin/env python
+import aide_messages
 import roslib
 import rospy
-from std_msgs.msg import Bool
 
-roslib.load_manifest("mario")
-
-from mario_messages.srv._GetEvent import GetEvent
-from mario_messages.srv._GetRoutine import GetRoutine
+from aide_messages.srv._GetEvent import GetEvent
+from aide_messages.srv._GetRoutine import GetRoutine
 
 from apis import storage
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as rtd
 
 import json
 import threading
-import mario_messages.msg
-from mario_messages.msg import FiredEvent, Event
-from mario_messages.srv import CallFunction, AddEvent, AddRule, GetAllRoutines, GetAllEvents
+
+from aide_messages.msg import FiredEvent, Event
+from aide_messages.srv import CallFunction, AddEvent, AddRule, GetAllRoutines, GetAllEvents
 from rospy import loginfo
 from rospy.core import logwarn
 from apis.ros_services import get_service_handler, get_slots
 
+roslib.load_manifest("aide")
 call = get_service_handler(CallFunction).get_service()
 register_event = get_service_handler(AddEvent).get_service()
 
@@ -235,7 +234,7 @@ class EventHandler(object):
 
     def load_routines(self):
         loginfo("Loading routines...")
-        loaded_routines = self.routine_storage.find(select_only=get_slots(mario_messages.msg.Routine))
+        loaded_routines = self.routine_storage.find(select_only=get_slots(aide_messages.msg.Routine))
         loginfo("...loaded routines!")
         loginfo("Appending Routines...")
         for routine in loaded_routines:
@@ -266,7 +265,7 @@ class EventHandler(object):
     def add_rule(self, routine, events):
         """
 
-        :type routine: mario_messages.msg.Routine
+        :type routine: aide_messages.msg.Routine
         """
         self.add_routine(routine)
         for event in events:
@@ -276,7 +275,7 @@ class EventHandler(object):
     def add_event(self, event):
         """
 
-        :type event: mario_messages.msg.Event
+        :type event: aide_messages.msg.Event
         """
         event.sparqlWhere = "{{{}}}".format(event.sparqlWhere)
         self.event_storage.insert(entry=event)
@@ -285,7 +284,7 @@ class EventHandler(object):
     def add_routine(self, routine):
         """
 
-        :type routine: mario_messages.msg.Routine
+        :type routine: aide_messages.msg.Routine
         """
         decoded_steps = [json.loads(step) for step in routine.execution_steps]
         # routine.execution_steps = decoded_steps
@@ -306,7 +305,7 @@ class EventHandler(object):
     def handle_incoming(self, event):
         """
 
-        :type event: mario_messages.msg.FiredEvent
+        :type event: aide_messages.msg.FiredEvent
         """
         loginfo("Incoming event: {}".format(event.name))
         event.params = json.loads(event.params)
@@ -321,8 +320,8 @@ if __name__ == '__main__':
 
     loginfo("Creating event handler...")
     event_handler = EventHandler()
-    # rospy.Subscriber("/mario/update_apis", Bool, lambda x: _reload_api_references() if x.data else ())
-    rospy.Subscriber("/mario/events", FiredEvent, event_handler.handle_incoming)
+    # rospy.Subscriber("/aide/update_apis", Bool, lambda x: _reload_api_references() if x.data else ())
+    rospy.Subscriber("/aide/events", FiredEvent, event_handler.handle_incoming)
 
     loginfo("Registering services...")
     get_service_handler(AddRule).register_service(event_handler.add_rule)

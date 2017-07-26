@@ -9,7 +9,6 @@ import apis.util
 import actions
 import imp
 
-roslib.load_manifest("mario")
 from rospy.core import logerror
 
 from rospy import loginfo
@@ -20,12 +19,13 @@ import json
 import os
 import traceback
 
-from mario_messages.srv import (CallFunction, AddActionProvider, GetAllActionProviders, GetActionProvider)
+from aide_messages.srv import (CallFunction, AddActionProvider, GetAllActionProviders, GetActionProvider)
 
 import config
 
 from apis.ros_services import get_service_handler
 
+roslib.load_manifest("aide")
 apis.__update()
 actions.__update()
 
@@ -81,17 +81,18 @@ class ActionHandler:
 
         try:
             loginfo("   importing...")
-            exec """import actions.{0} as {0}\nimp.reload({0})""".format(name)
+            exec """import actions.{0} as {0}""".format(name)
             imported_action_provider = eval(name)
+            imp.reload(imported_action_provider)
 
-        except Exception as e:
+        except Exception:
             logerror(traceback.format_exc())
             return (False, traceback.format_exc(1))
         loginfo("   {} imported!".format(imported_action_provider))
         actions = [
             {"name": f[0],
-             "doc" : apis.util.get_doc(f[1]),
-             "api" : name,
+             "doc": apis.util.get_doc(f[1]),
+             "api": name,
              "args": inspect.getargspec(f[1]).args}
             for f in
             [
@@ -151,7 +152,6 @@ class ActionHandler:
         return api_files
 
 
-
 def main():
     rospy.init_node("actions")
     loginfo("Creating action handler...")
@@ -161,7 +161,7 @@ def main():
     get_service_handler(CallFunction).register_service(
         lambda func_name, kwargs: action_handler.call_func(func_name, **json.loads(kwargs))
     )
-    rospy.Subscriber("/mario/update_apis", Bool, lambda x: action_handler.reload_api_references() if x.data else ())
+    rospy.Subscriber("/aide/update_apis", Bool, lambda x: action_handler.reload_api_references() if x.data else ())
 
     get_service_handler(GetActionProvider).register_service(lambda name: action_handler.get_action_provider(name) or ())
     get_service_handler(GetAllActionProviders).register_service(action_handler.get_all_actions_providers)

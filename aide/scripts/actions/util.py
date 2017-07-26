@@ -3,7 +3,7 @@ from rospy import loginfo
 from actions import *
 from apis import *
 
-from mario_messages.msg._RdfGraphStamped import RdfGraphStamped
+from aide_messages.msg._RdfGraphStamped import RdfGraphStamped
 import rospy
 
 from apis.rdf_utils import Triple, Graph

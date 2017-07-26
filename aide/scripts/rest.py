@@ -1,56 +1,29 @@
 #!/usr/bin/env python
-import json
 import threading
 
 import roslib
 import rospy
-from mario_messages.srv import (AddRule, GetApi, GetAllApis, GetActionProvider, GetAllActionProviders,
-                                AddActionProvider, AddExtractor, GetAllExtractors, GetExtractor, GetAllRoutines,
-                                GetEvent, GetAllEvents)
-from mario_messages.srv._AddApi import AddApi
-from mario_messages.srv._GetRoutine import GetRoutine
-from rdflib.term import URIRef
 
-import config
+from rospy import loginfo, logdebug
+from flask import Flask
+from flask_cors import CORS
+from flask_restful import Api, reqparse, Resource, abort, marshal
+from enum import Enum
+
+from aide_messages.srv import (AddRule, GetApi, GetAllApis, GetActionProvider, GetAllActionProviders,
+                                AddActionProvider, AddExtractor, GetAllExtractors, GetExtractor, GetAllRoutines,
+                                GetEvent, GetAllEvents, AddApi, GetRoutine)
+
 from apis import approximate
 from apis.util import camel_case_to_underscore
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as to_dict
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message as to_ros_message
 
-roslib.load_manifest("mario")
-
-from rospy import loginfo, logdebug
-from flask import Flask
-from flask_cors import CORS
-from flask_restful import Api, fields, reqparse, Resource, abort, marshal
-from enum import Enum
-
-from mario_messages.msg import Rule, Routine, Event
+from aide_messages.msg import Routine, Event
 from apis.ros_services import get_service_handler
 from yapf.yapflib.yapf_api import FormatCode as format_code
 
-
-# rdf_class_fields = {
-#     'URI'  : fields.String(attribute="queried_name"),
-#     'label': fields.String(attribute="class_label")
-# }
-
-# rdf_property_fields = {
-#     'URI'   : fields.String(attribute="name"),
-#     'label' : fields.String,
-#     'domain': fields.String,
-#     'range' : fields.String
-# }
-
-# namespace_fields = {
-#     'URI'      : fields.String,
-#     'namespace': fields.String
-# }
-#
-# rule_fields_short = {
-#     'name'       : fields.String,
-#     'description': fields.String
-# }
+roslib.load_manifest("aide")
 
 
 def parse_api():
@@ -76,13 +49,11 @@ def parse_code():
 
 
 def parse_rule():
+    # TODO
+    # subject of change, will be replaced by a generalized function
+    # that validates json input against a ros message
     def parse_routine(routine):
-        try:
-            msg = to_ros_message(Routine._type, routine)
-            print msg
-        except Exception as e:
-            print e
-        return msg or None
+        return to_ros_message(Routine._type, routine)
 
     def parse_events(events):
         parsed_events = []
@@ -100,68 +71,40 @@ def parse_rule():
     return parser.parse_args()
 
 
-def parse_function():
-    parser = reqparse.RequestParser()
-    parser.add_argument('name', required=True, type=str,
-                        help="Function needs a name!")
-    parser.add_argument('doc', required=False, type=str, default="",
-                        help="Provide documentation to your function!")
-    parser.add_argument('args', required=False, type=str, default="",
-                        help="Arguments for the function!", action='append')
-    parser.add_argument('body', required=True, type=str,
-                        help="Need function body!")
-    args = parser.parse_args()
-    loginfo(args.args)
-    return args
-
-
-
-
 class ResourceEnum(Enum):
-    # Function = {
-    #     "get": get_service_handler(GetFunction).call_service,
-    #     "path": "/mario/functions/<string:name>"
-    # }
-
     ActionProvider = {
-        "get" : get_service_handler(GetActionProvider).call_service,
-        "path": "/mario/action_providers/<string:name>"
+        "get": get_service_handler(GetActionProvider).call_service,
+        "path": "/aide/action_providers/<string:name>"
     }
     ActionProviders = {
-        "post"          : get_service_handler(AddActionProvider).call_service,
-        "get"           : get_service_handler(GetAllActionProviders).call_service,
+        "post": get_service_handler(AddActionProvider).call_service,
+        "get": get_service_handler(GetAllActionProviders).call_service,
         "validate_input": parse_api
     }
 
     Extractor = {
-        "get" : get_service_handler(GetExtractor).call_service,
-        "path": "/mario/extractors/<string:name>"
+        "get": get_service_handler(GetExtractor).call_service,
+        "path": "/aide/extractors/<string:name>"
     }
     Extractors = {
-        "post"          : get_service_handler(AddExtractor).call_service,
-        "get"           : get_service_handler(GetAllExtractors).call_service,
+        "post": get_service_handler(AddExtractor).call_service,
+        "get": get_service_handler(GetAllExtractors).call_service,
         "validate_input": parse_api
     }
 
-    # Functions = {
-    #     "post": lambda **args: get_service_handler(AddFunction).get_service()(Function(**args)),
-    #     "get": get_service_handler(GetAllFunctions).call_service,
-    #     "validate_input": parse_function,
-    # }
-
     Api = {
-        "get" : get_service_handler(GetApi).call_service,
-        "path": "/mario/apis/<string:name>"
+        "get": get_service_handler(GetApi).call_service,
+        "path": "/aide/apis/<string:name>"
     }
     Apis = {
-        "post"          : get_service_handler(AddApi).call_service,
-        "get"           : get_service_handler(GetAllApis).call_service,
+        "post": get_service_handler(AddApi).call_service,
+        "get": get_service_handler(GetAllApis).call_service,
         "validate_input": parse_api
     }
 
     Routine = {
-        "get" : get_service_handler(GetRoutine).call_service,
-        "path": "/mario/routines/<string:name>"
+        "get": get_service_handler(GetRoutine).call_service,
+        "path": "/aide/routines/<string:name>"
     }
 
     Routines = {
@@ -169,8 +112,8 @@ class ResourceEnum(Enum):
     }
 
     Event = {
-        "get" : get_service_handler(GetEvent).call_service,
-        "path": "/mario/events/<string:name>"
+        "get": get_service_handler(GetEvent).call_service,
+        "path": "/aide/events/<string:name>"
     }
 
     Events = {
@@ -178,65 +121,65 @@ class ResourceEnum(Enum):
     }
 
     Format = {
-        "post"          : lambda code: format_code(code)[0],
+        "post": lambda code: format_code(code)[0],
         "validate_input": parse_code,
-        "envelope"      : "formatted_code"
+        "envelope": "formatted_code"
     }
 
     Rules = {
-        "post"          : lambda **args: get_service_handler(AddRule).call_service(**args),
+        "post": lambda **args: get_service_handler(AddRule).call_service(**args),
         "validate_input": parse_rule,
     }
 
     Related = {
-        "get"     : lambda **args: approximate.get_semantically_related(**args),
-        'path'    : "/mario/<string:type>/<string:to>/related/<int:top_k>",
+        "get": lambda **args: approximate.get_semantically_related(**args),
+        'path': "/aide/<string:type>/<string:to>/related/<int:top_k>",
         "envelope": "result"
     }
 
     Version = {
-        "get" : lambda: {"version": '"Alluring Alliteration"'},
-        "path": "/mario/_version"
+        "get": lambda: {"version": '"Alluring Alliteration"'},
+        "path": "/aide/_version"
     }
 
-    QueryProposals = {
-        "path"        : ("/mario/classes/<string:subject_class>/qp/<string:plain_text>/<int:top_k>",
-                         "/mario/classes/<string:subject_class>/qp/<string:plain_text>"),
-        "get"         : (lambda subject_class, plain_text, top_k=3:
-                         completer.get_queries_from_plaintext_and_subject(
-                             plain_text=plain_text, top_k=top_k,
-                             subject_class=URIRef("http://prokyon:5000/mario/classes/" + subject_class))),
-
-        "marshal_with": {
-            "code": fields.String,
-            "path": fields.String
-        },
-        "envelope"    : "proposals"
-
-    }
-
-    ClassProposals = {
-        "path"        : ("/mario/classes/<string:subject>/related/<int:top_k>",
-                         "/mario/classes/<string:subject>/related/"),
-        "get"         : (lambda subject, top_k=3: completer.get_subject_from_plaintext(subject)),
-        "marshal_with": {
-            "instance": fields.String,
-            "class"   : fields.String
-        },
-        "envelope"    : "classes"
-    }
+    # QueryProposals = {
+    #     "path"        : ("/aide/classes/<string:subject_class>/qp/<string:plain_text>/<int:top_k>",
+    #                      "/aide/classes/<string:subject_class>/qp/<string:plain_text>"),
+    #     "get"         : (lambda subject_class, plain_text, top_k=3:
+    #                      completer.get_queries_from_plaintext_and_subject(
+    #                          plain_text=plain_text, top_k=top_k,
+    #                          subject_class=URIRef("http://prokyon:5000/aide/classes/" + subject_class))),
+    #
+    #     "marshal_with": {
+    #         "code": fields.String,
+    #         "path": fields.String
+    #     },
+    #     "envelope"    : "proposals"
+    #
+    # }
+    #
+    # ClassProposals = {
+    #     "path"        : ("/aide/classes/<string:subject>/related/<int:top_k>",
+    #                      "/aide/classes/<string:subject>/related/"),
+    #     "get"         : (lambda subject, top_k=3: completer.get_subject_from_plaintext(subject)),
+    #     "marshal_with": {
+    #         "instance": fields.String,
+    #         "class"   : fields.String
+    #     },
+    #     "envelope"    : "classes"
+    # }
 
     def validate_input(self):
         return self.value['validate_input']()
 
     def has_get(self):
-        return True if self.value.has_key("get") else False
+        return "get" in self.value
 
     def get(self, *args, **kwargs):
         return self.value["get"](*args, **kwargs)
 
     def has_post(self):
-        return True if self.value.has_key("post") else False
+        return "post" in self.value
 
     def post(self, *args, **kwargs):
         return self.value["post"](*args, **kwargs)
@@ -246,21 +189,21 @@ class ResourceEnum(Enum):
 
         :rtype: tuple
         """
-        if self.value.has_key("path"):
+        if "path" in self.value:
             path = self.value["path"]
             # if path is a tuple just return it, if not add a trailing slash if there is none and convert to tuple.
             return path if isinstance(path, tuple) else (path, path + "/") if not path.endswith("/") else (path,)
         else:
             # if no path value is defined, create a default path
             name = camel_case_to_underscore(self.name)
-            return ("/mario/{}".format(name), "/mario/{}/".format(name))
+            return "/aide/{}".format(name), "/aide/{}/".format(name)
 
     def envelope(self):
         # return self.value["envelope"] if self.value.has_key("envelope") else None
         return self.value.get("envelope", None)
 
     def marshal_with(self):
-        return self.value["marshal_with"] if self.value.has_key("marshal_with") else None
+        return self.value.get("marshal_with", None)
 
 
 def handle_result(result, rsc):
@@ -366,7 +309,7 @@ def build_resources(api):
 class RestApi:
     def __init__(self):
         loginfo("Creating RestApi instance.")
-        self.app = Flask("Mario", static_url_path="")
+        self.app = Flask("aide", static_url_path="")
         self.api = Api(self.app, catch_all_404s=True)
         CORS(self.app)
         build_resources(self.api)

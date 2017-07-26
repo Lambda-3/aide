@@ -1,6 +1,6 @@
 import pymongo
 import rospy
-import mario_messages.srv as services
+import aide_messages.srv as services
 #
 from rospy import loginfo, logdebug
 from util import camel_case_to_underscore as cc_to_underscore
@@ -38,9 +38,9 @@ class ServiceHandler:
 
     def __init__(self, service_name):
         # import the auto generated class corresponding to the service
-        exec """from mario_messages.srv import {}""".format(service_name)
+        exec """from aiode_messages.srv import {}""".format(service_name)
         # service channel is the service name converted to underscore notation
-        self.SERVICE_CHANNEL = "mario/{}".format(cc_to_underscore(service_name))
+        self.SERVICE_CHANNEL = "aide/{}".format(cc_to_underscore(service_name))
         self.service_name = service_name
         self.service_class = eval(service_name)
 

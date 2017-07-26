@@ -14,14 +14,14 @@ def create(**params):
         # noone needs to understands this. just gets the collection name from Enums defined name
         name = inspect.stack()[1][4][0].split("=", 1)[0].strip()
         params['collection'] = camel_case_to_underscore(name)
-    try:
-        params['select_only']
-        try:
-            params['select_only'][0]
-        except IndexError:
-            params['select_only'] = [params['select_only']]
-    except KeyError:
+
+    if "select_only" not in params:
         params['select_only'] = ["name"]
+
+    try:
+        params['select_only'][0]
+    except IndexError:
+        params['select_only'] = [params['select_only']]
 
     try:
         params['word_format']
@@ -44,14 +44,16 @@ class Types(Enum):
 
     Routines = create()
 
+
 def get_semantically_related(to, type, top_k=3):
     """
     
-    :param name: 
-    :type name: str
+    :param to:
+    :type to: str
     :param type:
     :type type: str
     :param top_k:
+    :type  top_k: int
     :return: 
     """
     type_name = underscore_to_camel_case(type)
