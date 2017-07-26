@@ -7,7 +7,7 @@ from rdflib.term import URIRef
 # namespaces TODO: do it more generically
 speech = Namespace("http://lambda3.org/aide/speech/")
 properties = Namespace("http://lambda3.org/aide/properties/")
-robot = Namespace("http://lambda3.org/self/")
+robot = Namespace("http://lambda3.org/aide/self/")
 
 def Graph(*triples):
     return RdfGraphStamped(triples)
