@@ -1,0 +1,5 @@
+string name
+string file_content
+---
+bool success
+string errors

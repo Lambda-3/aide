@@ -1,0 +1,9 @@
+string CONTINUOUS="continuous"
+string NEWONLY="newonly"
+string PRECISE="precise"
+string name
+string[] params
+uint8 range
+uint8 step
+uint8 executionType
+string sparqlWhere
