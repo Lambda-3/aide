@@ -1,10 +1,5 @@
 import sound_play
-print("="*20)
-print(sound_play)
-print("="*20)
 import sound_play.libsoundplay
-print(sound_play.libsoundplay)
-print("="*20)
 from sound_play.libsoundplay import SoundClient
 
 

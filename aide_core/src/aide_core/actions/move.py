@@ -7,7 +7,15 @@ from aide_core.apis import tag
 
 
 def move(x, y):
-    client = actionlib.SimpleActionClient("move_base", move_base_msgs.msg.MoveBaseAction)
+    """
+    Moves the robot to a place defined by coordinates x and y.
+    
+    :type x: float
+    :type y: int
+    :rtype: NoneType
+    """
+    client = actionlib.SimpleActionClient("move_base",
+                                          move_base_msgs.msg.MoveBaseAction)
     client.wait_for_server(rospy.Duration(10))
     goal = move_base_msgs.msg.MoveBaseGoal()
     goal.target_pose.header.frame_id = "map"
@@ -18,7 +26,6 @@ def move(x, y):
     client.send_goal(goal)
     success = client.wait_for_result(rospy.Duration(60))
     loginfo(success)
-    
 
 
 def move_to_place(name):

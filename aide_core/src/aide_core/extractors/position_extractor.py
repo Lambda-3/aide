@@ -1,7 +1,6 @@
 import rospy
-from apis.rdf_utils import Graph, Triple, robot, properties
+from aide_core.apis.rdf_utils import Graph, Triple, robot, properties
 from tf.listener import TransformListener
-from tf2_msgs.msg._TFMessage import TFMessage
 
 from aide_core.extractors import AbstractExtractor
 
@@ -18,12 +17,12 @@ class PositionExtractor(AbstractExtractor):
 
     def extract(self):
         """
-
-        :type message: TFMessage
+        Hurr durr.
+        
         """
         time = self.get_time()
         try:
-            ((x, y, z), rot) = self.listener.lookupTransform(self.MAP_LINK, self.ROBOT_LINK, rospy.Time(0))
+            ((x, y, _), _) = self.listener.lookupTransform(self.MAP_LINK, self.ROBOT_LINK, rospy.Time(0))
             return Graph(Triple(robot.self, properties.position_x, x, time),
                          Triple(robot.self, properties.position_y, y, time))
         except:

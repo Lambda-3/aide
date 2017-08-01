@@ -34,11 +34,11 @@ def create(**params):
 class Types(Enum):
     Apis = create()
 
-    ApiFuncs = create(select_only=["api", "name", "args"], word_format="{api} {name}")
+    ApiFuncs = create(select_only=["api", "name", "args", "hinted_args"], word_format="{api} {name}")
 
     Actions = create()
 
-    ActionFuncs = create(select_only=["api", "name", "args"], word_format="{api} {name}")
+    ActionFuncs = create(select_only=["api", "name", "args", "hinted_args"], word_format="{api} {name}")
 
     Events = create(select_only=["name", "params"])
 

@@ -1,6 +1,6 @@
-from apis import joke
+from aide_core.apis import joke
 
-from aide_core.actions import say
+from aide_core.actions.speech import say
 
 
 def tell_joke():

@@ -1,9 +1,10 @@
 #!/usr/bin/env python
-
+import importlib
 import os
 import re
 import traceback
 
+import imp
 import reimport
 import roslib
 import rospy
@@ -15,6 +16,7 @@ from rospy.core import logerror
 from std_msgs.msg import Bool, String
 
 from aide_core import config
+from aide_core.apis import util
 from apis.ros_services import cc_to_underscore, get_service_handler
 
 roslib.load_manifest("aide_core")
@@ -32,7 +34,7 @@ class ExtractorHandler(object):
             loginfo("Working on: {}".format(file_name))
             with open(file_name, "r") as f:
                 file_content = f.read()
-            self.add_extractor(file_content)
+            self.add_extractor(f.name.rsplit("/", 1)[-1], file_content, loading=True)
 
     def load_all_extractors(self):
         pass
@@ -69,15 +71,17 @@ class ExtractorHandler(object):
 
         self.extractors.append(extractor)
 
-    def add_extractor(self, file_content):
+    def add_extractor(self, name, file_content, loading=False):
         class_name = re.findall("class\s+(.*?)[\(,:]", file_content)[0]
         loginfo("Class name: {}".format(class_name))
-        extractor_name = cc_to_underscore(class_name)
+        if name.endswith(".py"):
+            name = name[:-3]
+        extractor_name = name
         file_name = extractor_name + ".py"
         loginfo("File name: {}".format(file_name))
+
+        loginfo("   Compiling...")
         try:
-            # todo maybe use lint
-            loginfo("   Compiling...")
             compile(file_content, file_name, "exec")
         except Exception as e:
             return (False, traceback.format_exc(limit=0))
@@ -86,18 +90,26 @@ class ExtractorHandler(object):
         with open(config.EXTRACTORS_PATH + "/" + file_name, "w+") as f:
             f.write(file_content)
 
-        try:
-            loginfo("   Importing...")
-            exec("""import extractors.{0} as {0}""".format(extractor_name))
-            ExtractorClass = eval("{}.{}".format(extractor_name, class_name))
+        lint_output = ""
+        if not loading:
+            loginfo("   applying Pylint...")
+            lint_output = util.apply_lint(config.EXTRACTORS_PATH + "/" + file_name)
 
+        loginfo("   Importing...")
+        try:
+            # exec ("""import extractors.{0} as {0}""".format(extractor_name))
+            extractor_module = importlib.import_module("aide_core.extractors.{}".format(extractor_name))
+            loginfo(extractor_module)
+            imp.reload(extractor_module)
+
+            ExtractorClass = extractor_module.__dict__[class_name]
         except Exception as e:
             logerror(e)
-            return (False, traceback.format_exc(1))
+            return False, lint_output + traceback.format_exc(1)
         loginfo("   ...imported!")
         self.register_extractor(ExtractorClass)
         loginfo("   ...registered!")
-        return (True, "")
+        return True, lint_output
 
     def get_all_extractors(self):
         return [api_path.rsplit("/", 1)[-1].rsplit(".py", 1)[-2] for api_path in self.get_all_extractor_files()]

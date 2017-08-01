@@ -55,6 +55,7 @@ add_message_files(
   RdfTriple.msg
   RdfTripleStamped.msg
   Routine.msg
+  ShortMessage.msg
   Skeleton.msg
 )
 

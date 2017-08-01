@@ -1,6 +1,6 @@
 from uuid import uuid4 as uuid
 
-from apis.rdf_utils import Graph, Triple, robot, properties
+from aide_core.apis.rdf_utils import Graph, Triple, robot, properties
 from std_msgs.msg import String
 
 from aide_core.extractors import AbstractTopicExtractor
@@ -9,7 +9,7 @@ from aide_core.extractors import AbstractTopicExtractor
 class InputExtractor(AbstractTopicExtractor):
     from_channel = "/aide/console_input"
     type = String
-    queue_size = 42
+    queue_size = 43
     rate = 2
 
     def __init__(self, **kwargs):

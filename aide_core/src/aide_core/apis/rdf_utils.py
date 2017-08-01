@@ -1,6 +1,6 @@
 import rospy
 from aide_messages.msg import RdfTripleStamped, RdfGraphStamped
-from rdflib import Literal, XSD, Namespace
+from rdflib import Literal, XSD, Namespace, RDF
 
 from rdflib.term import URIRef
 
@@ -8,7 +8,8 @@ from rdflib.term import URIRef
 speech = Namespace("http://lambda3.org/aide/speech/")
 properties = Namespace("http://lambda3.org/aide/properties/")
 robot = Namespace("http://lambda3.org/aide/self/")
-
+rdf = RDF
+classes = Namespace("http://lambda3.org/aide/classes/")
 def Graph(*triples):
     return RdfGraphStamped(triples)
 

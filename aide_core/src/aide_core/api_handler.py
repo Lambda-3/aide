@@ -56,34 +56,27 @@ class ApiHandler:
 
         loginfo("File name: ".format(file_name))
 
-        loginfo("   applying Pylint...")
-        lint_output = ""
-
         try:
-            # todo maybe use lint
             loginfo("   compiling...")
             compile(file_content, file_name, "exec")
-        except Exception as e:
+        except Exception:
             return False, traceback.format_exc(limit=0)
         loginfo("   compiled!")
 
         with open(config.APIS_PATH + "/" + file_name, "w+") as f:
             f.write(file_content)
 
+        lint_output = ""
         if not loading:
-            options = """%s --msg-template='{path}({line:3d}:{column:2d}): [{obj}] {msg}' 
-                --disable=C,R,I""" % (config.APIS_PATH + "/" + file_name)
-            out, err = lint.py_run(options, return_std=True)
-            lint_output = "".join(err.readlines()) + "".join(out.readlines())
-            loginfo("lint says:")
-            loginfo(lint_output)
+            loginfo("   applying Pylint...")
+            lint_output = util.apply_lint(config.APIS_PATH + "/" + file_name)
 
+        loginfo("   importing...")
         try:
-            loginfo("   importing...")
-            exec("""import apis.{0} as {0}""".format(name))
+            exec ("""import apis.{0} as {0}""".format(name))
             imported_api = eval(name)
             imp.reload(imported_api)
-        except Exception as e:
+        except Exception:
             logerror(traceback.format_exc())
             return False, lint_output + traceback.format_exc(limit=1)
         loginfo("   imported!")
@@ -93,7 +86,8 @@ class ApiHandler:
                 "name": f[0],
                 "doc": util.get_doc(imported_api),
                 "api": name,
-                "args": inspect.getargspec(f[1]).args
+                "args": inspect.getargspec(f[1]).args,
+                "hinted_args": util.get_type_hints(f[1])[0]
             }
             for f in
             [
@@ -113,7 +107,7 @@ class ApiHandler:
 
         try:
             self.notify_function()
-        except AttributeError as e:
+        except AttributeError:
             logwarn("No notify function set. If you see this message on startup, all is fine.")
         return True, lint_output
 

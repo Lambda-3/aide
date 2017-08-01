@@ -14,6 +14,7 @@ from flask_restful import Api, reqparse, Resource, abort, marshal
 from rospy import loginfo, logdebug
 from yapf.yapflib.yapf_api import FormatCode as format_code
 
+from aide_core.apis import query_proposals
 from apis import approximate
 from apis.ros_services import get_service_handler
 from apis.util import camel_case_to_underscore
@@ -42,6 +43,17 @@ def parse_code():
                         help="Code must not be empty!",
                         location="json")
 
+    return parser.parse_args()
+
+
+def parse_sparql_autocomplete():
+    parser = reqparse.RequestParser()
+    parser.add_argument('text', required=True, type=str,
+                        help="Text must not be empty!",
+                        location="json")
+    parser.add_argument('classes', required=False, type=list,
+                        default=None, location="json")
+    parser.add_argument('top_k', required=False, type=int, default=5, location="json")
     return parser.parse_args()
 
 
@@ -138,21 +150,14 @@ class ResourceEnum(Enum):
         "path": "/aide/_version"
     }
 
-    # QueryProposals = {
-    #     "path"        : ("/aide/classes/<string:subject_class>/qp/<string:plain_text>/<int:top_k>",
-    #                      "/aide/classes/<string:subject_class>/qp/<string:plain_text>"),
-    #     "get"         : (lambda subject_class, plain_text, top_k=3:
-    #                      completer.get_queries_from_plaintext_and_subject(
-    #                          plain_text=plain_text, top_k=top_k,
-    #                          subject_class=URIRef("http://prokyon:5000/aide/classes/" + subject_class))),
-    #
-    #     "marshal_with": {
-    #         "code": fields.String,
-    #         "path": fields.String
-    #     },
-    #     "envelope"    : "proposals"
-    #
-    # }
+    SparqlComplete = {
+        "path": "/aide/qp",
+        "post": lambda **args: query_proposals.get_query_proposal(**args),
+        "validate_input": parse_sparql_autocomplete,
+        "envelope": "proposals"
+
+    }
+
     #
     # ClassProposals = {
     #     "path"        : ("/aide/classes/<string:subject>/related/<int:top_k>",

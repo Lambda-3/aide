@@ -1,0 +1,62 @@
+@prefix classes: <http://lambda3.org/aide/classes/> .
+@prefix functions: <http://lambda3.org/aide/functions/> .
+@prefix robot: <http://lambda3.org/aide/self/> .
+@prefix speech: <http://lambda3.org/aide/speech/> .
+@prefix persons: <http://lambda3.org/aide/persons/> .
+@prefix postures: <http://lambda3.org/aide/postures/> .
+@prefix properties: <http://lambda3.org/aide/properties/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rules: <http://lambda3.org/aide/rules/> .
+@prefix skeletons: <http://lambda3.org/aide/skeletons/> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+    
+robot:self properties:position_x 2.99 .
+robot:self properties:position_y 1.33 .
+robot:self properties:in_room "Viktors room" .
+
+robot:uuid-1337 properties:command "move";
+    properties:arg0 "left".
+
+robot:uuid-2448 properties:skypeMessage "all your base are belong to us" .
+
+
+robot:uuid-3559 a classes:WhatsAppMessage;
+    properties:content "gibe me money, hue hue hue".
+
+speech:uuid-1579 properties:speechContent "yo whaddup".
+speech:uuid-1579 properties:sentimentScore -1.3.
+
+
+
+properties:speechContent rdfs:domain classes:genClass_speech_0;
+    rdfs:range xsd:string.
+
+properties:content rdfs:domain classes:WhatsAppMessage;
+    rdfs:range xsd:string.
+
+properties:sender rdfs:range xsd:string;
+    rdfs:domain classes:WhatsAppMessage.
+
+properties:sentimentScore rdfs:range xsd:float;
+    rdfs:domain classes:genClass_speech_0;
+    rdfs:domain classes:WhatsAppMessage.
+
+properties:skypeMessage rdfs:range xsd:string;
+    rdfs:domain classes:genClass_robot_0.
+
+properties:command rdfs:range xsd:string;
+    rdfs:domain classes:genClass_robot_1.
+
+properties:arg0 rdfs:range xsd:string;
+    rdfs:domain classes:genClass_robot_1.
+
+properties:position_x rdfs:range xsd:float;
+    rdfs:domain classes:genClass_robot_self.
+
+properties:position_y rdfs:range xsd:float;
+    rdfs:domain classes:genClass_robot_self.
+
+properties:in_room rdfs:range xsd:string;
+    rdfs:domain classes:genClass_robot_self.

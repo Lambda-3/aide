@@ -35,7 +35,7 @@ class ActionHandler:
             with open(file_name, "r") as f:
                 loginfo("Working on: {}".format(file_name))
                 file_content = f.read()
-            self.add_action_provider(f.name.rsplit("/", 1)[-1], file_content)
+            self.add_action_provider(f.name.rsplit("/", 1)[-1], file_content, loading=True)
 
     def get_action_provider(self, name):
         try:
@@ -55,23 +55,27 @@ class ActionHandler:
                 loginfo("Module {} changed. reloading...".format(module))
                 reimport.reimport(module)
 
-    def add_action_provider(self, name, file_content):
+    def add_action_provider(self, name, file_content, loading=False):
         loginfo("Adding action provider %s" % name)
         if name.endswith(".py"):
             name = name[:-3]
         file_name = name + ".py"
         loginfo("File name: ".format(file_name))
 
+        loginfo("compiling...")
         try:
-            # todo maybe use lint
-            loginfo("compiling...")
             compile(file_content, file_name, "exec")
-        except Exception as e:
+        except Exception:
             return (False, traceback.format_exc(limit=0))
 
         loginfo("compiled!")
         with open(config.ACTION_PROVIDERS_PATH + "/" + file_name, "w+") as f:
             f.write(file_content)
+
+        lint_output = ""
+        if not loading:
+            loginfo("   applying Pylint...")
+            lint_output = apis.util.apply_lint(config.ACTION_PROVIDERS_PATH + "/" + file_name)
 
         try:
             loginfo("   importing...")
@@ -81,17 +85,20 @@ class ActionHandler:
 
         except Exception:
             logerror(traceback.format_exc())
-            return (False, traceback.format_exc(1))
+            return (False, lint_output + traceback.format_exc(1))
         loginfo("   {} imported!".format(imported_action_provider))
         actions = [
-            {"name": f[0],
-             "doc": apis.util.get_doc(f[1]),
-             "api": name,
-             "args": inspect.getargspec(f[1]).args}
+            {
+                "name": f[0],
+                "doc": apis.util.get_doc(f[1]),
+                "api": name,
+                "args": inspect.getargspec(f[1]).args,
+                "hinted_args": apis.util.get_type_hints(f[1])[0]
+            }
             for f in
             [
                 f for f in inspect.getmembers(imported_action_provider, predicate=inspect.isfunction) if
-                f[1].__module__ == imported_action_provider.__name__
+                f[1].__module__ == imported_action_provider.__name__ and not f[0].startswith("_")
             ]
         ]
 
@@ -107,7 +114,7 @@ class ActionHandler:
 
         loginfo("   setting: self.{} = {}".format(name, imported_action_provider))
         setattr(self, name, imported_action_provider)
-        return (True, "")
+        return True, lint_output
 
     def call_func(self, func_name, **kwargs):
         api, func = func_name.rsplit(".", 1)
