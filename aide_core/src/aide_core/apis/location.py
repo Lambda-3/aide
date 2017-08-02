@@ -3,7 +3,9 @@ import subprocess
 import requests
 import json
 
-API_KEY = "%YOUR_API_KEY%"
+from aide_core import credentials
+
+API_KEY = credentials.GOOGLE_LOCATION_API_KEY
 ENDPOINT = "https://www.googleapis.com/geolocation/v1/geolocate?key={}".format(API_KEY)
 
 

@@ -3,6 +3,7 @@ import re
 from pylint import lint
 from rospy import logwarn, loginfo
 from pylint import epylint as lint
+from yapf.yapflib.yapf_api import FormatCode
 
 _first_cap_re = re.compile('(.)([A-Z][a-z]+)')
 _all_cap_re = re.compile('([a-z0-9])([A-Z])')
@@ -78,3 +79,6 @@ def apply_lint(path):
                     --disable=C,R,I""" % path
     out, err = lint.py_run(options, return_std=True)
     return "".join(err.readlines()) + "".join(out.readlines())
+
+def format_code(code):
+    return FormatCode(code)[0]

@@ -8,7 +8,7 @@ from rospy import loginfo
 import rospy
 
 from aide_messages.msg import ShortMessage
-from std_msgs.msg import String
+from aide_core import credentials
 from yowsup.layers.interface import YowInterfaceLayer, ProtocolEntityCallback
 from yowsup.layers.protocol_chatstate.protocolentities import OutgoingChatstateProtocolEntity, ChatstateProtocolEntity
 from yowsup.layers.protocol_messages.protocolentities import TextMessageProtocolEntity
@@ -74,14 +74,14 @@ class AideRosLayer(YowInterfaceLayer):
 
 def main():
     rospy.init_node("whatsapp_service")
-    credentials = "YOUR CREDENTIALS HERE"  # replace with your phone and password
+    cred = credentials.WHATSAPP
     stackBuilder = YowStackBuilder()
     stack = (stackBuilder
              .pushDefaultLayers(True)
              .push(AideRosLayer)
              .build())
     loginfo("Stack built...")
-    stack.setCredentials(credentials)
+    stack.setCredentials(cred)
     stack.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_CONNECT))  # sending the connect signal
     loginfo("Connected...")
     atexit.register(lambda: stack.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_DISCONNECT)))

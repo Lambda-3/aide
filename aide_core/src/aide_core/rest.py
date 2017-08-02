@@ -12,12 +12,11 @@ from flask import Flask
 from flask_cors import CORS
 from flask_restful import Api, reqparse, Resource, abort, marshal
 from rospy import loginfo, logdebug
-from yapf.yapflib.yapf_api import FormatCode as format_code
 
 from aide_core.apis import query_proposals
 from apis import approximate
 from apis.ros_services import get_service_handler
-from apis.util import camel_case_to_underscore
+from apis.util import camel_case_to_underscore, format_code
 from rospy_message_converter.message_converter import convert_dictionary_to_ros_message as to_ros_message
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as to_dict
 
@@ -129,7 +128,7 @@ class ResourceEnum(Enum):
     }
 
     Format = {
-        "post": lambda code: format_code(code)[0],
+        "post": format_code,
         "validate_input": parse_code,
         "envelope": "formatted_code"
     }

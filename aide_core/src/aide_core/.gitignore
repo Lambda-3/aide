@@ -1,5 +1,3 @@
-test*
-graveyard
 pylintrc
-apis/google_api_key
 cep.sh
+/credentials.py
