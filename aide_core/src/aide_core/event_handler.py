@@ -30,11 +30,11 @@ class Step(object):
 
 
 class Execute(Step):
-    def __init__(self, function, mapping=dict(), literals=dict()):
+    def __init__(self, function, mapping=None, literals=None):
         self.what = function
-        self.mapping = mapping
+        self.mapping = mapping or dict()
         # self.parametrized = True if mapping else False
-        self.literals = literals
+        self.literals = literals or dict()
 
     def fill_parameters(self, params):
         """
@@ -276,7 +276,12 @@ class EventHandler(object):
         :type event: aide_messages.msg.Event
         """
         event.sparqlWhere = "{{{}}}".format(event.sparqlWhere)
-        self.event_storage.insert(entry=event)
+        result = self.event_storage.find_one(where={"name": event.name})
+        if result:
+            loginfo("Event with this name already exists...")
+            self.event_storage.replace_one(replace_with=event, where={"name": event.name})
+        else:
+            self.event_storage.insert(entry=event)
         register_event(event)
 
     def add_routine(self, routine):
