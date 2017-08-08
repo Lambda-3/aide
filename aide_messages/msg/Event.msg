@@ -1,6 +1,6 @@
-string CONTINUOUS="continuous"
-string NEWONLY="newonly"
-string PRECISE="precise"
+string CONTINUOUS=0
+string NEWONLY=1
+string PRECISE=2
 string name
 string[] params
 uint8 range
