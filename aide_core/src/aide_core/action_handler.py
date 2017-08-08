@@ -11,7 +11,7 @@ import rospy
 from aide_messages.srv import (CallFunction, AddActionProvider, GetAllActionProviders, GetActionProvider)
 from rospy import loginfo
 from rospy.core import logerror
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 
 import actions
 import apis.storage
@@ -49,11 +49,12 @@ class ActionHandler:
             else:
                 raise IOError(e)
 
-    def reload_api_references(self):
-        for module in reimport.modified(config.APIS_PATH):
-            if not module == "__main__":
-                loginfo("Module {} changed. reloading...".format(module))
-                reimport.reimport(module)
+    def reload_api_references(self, name):
+        # for module in reimport.modified(config.APIS_PATH):
+        #     if not module == "__main__":
+        #         loginfo("Module {} changed. reloading...".format(module))
+        loginfo("Reloading {}".format(name))
+        reimport.reimport('aide_core.apis.{}'.format(name))
 
     def add_action_provider(self, name, file_content, loading=False):
         loginfo("Adding action provider %s" % name)
@@ -162,7 +163,7 @@ def main():
     get_service_handler(CallFunction).register_service(
         lambda func_name, kwargs: action_handler.call_func(func_name, **json.loads(kwargs))
     )
-    rospy.Subscriber("/aide/update_apis", Bool, lambda x: action_handler.reload_api_references() if x.data else ())
+    rospy.Subscriber("/aide/update_apis", String, lambda x: action_handler.reload_api_references(x.data))
 
     get_service_handler(GetActionProvider).register_service(lambda name: action_handler.get_action_provider(name) or ())
     get_service_handler(GetAllActionProviders).register_service(action_handler.get_all_actions_providers)

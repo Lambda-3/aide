@@ -32,8 +32,7 @@ class AideRosLayer(YowInterfaceLayer):
     def onMessage(self, message):
         # send receipt otherwise we keep receiving the same message over and over
 
-        loginfo("Incoming message...")
-        loginfo(message)
+        loginfo("Incoming message...\n{}".format(message))
         receipt = OutgoingReceiptProtocolEntity(message.getId(), message.getFrom(),
                                                 'read', message.getParticipant())
         self.toLower(receipt)
@@ -62,14 +61,17 @@ class AideRosLayer(YowInterfaceLayer):
             to = to[1:]
         if to.startswith("00"):
             to = to[2:]
-
+        # ...typing
         entity = OutgoingChatstateProtocolEntity(ChatstateProtocolEntity.STATE_TYPING, to)
         self.toLower(entity)
+
         rospy.sleep(0.5)
-        outgoingMessageProtocolEntity = TextMessageProtocolEntity(short_message.content, to=to)
-        self.toLower(outgoingMessageProtocolEntity)
+
         entity = OutgoingChatstateProtocolEntity(ChatstateProtocolEntity.STATE_PAUSED, to)
         self.toLower(entity)
+
+        outgoingMessageProtocolEntity = TextMessageProtocolEntity(short_message.content, to=to)
+        self.toLower(outgoingMessageProtocolEntity)
 
 
 def main():

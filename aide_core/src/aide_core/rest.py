@@ -22,6 +22,7 @@ from rospy_message_converter.message_converter import convert_ros_message_to_dic
 
 roslib.load_manifest("aide_core")
 
+query_proposals.__init()
 
 def parse_api():
     parser = reqparse.RequestParser()

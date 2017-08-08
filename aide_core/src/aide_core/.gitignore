@@ -1,3 +1,4 @@
 pylintrc
 cep.sh
 /credentials.py
+/test*

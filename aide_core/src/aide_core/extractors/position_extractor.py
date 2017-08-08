@@ -1,11 +1,11 @@
 import rospy
-from aide_core.apis.rdf_utils import Graph, Triple, robot, properties
 from tf.listener import TransformListener
 
-from aide_core.extractors import AbstractExtractor
+from aide_core.extractors import AbstractPeriodicExtractor
+from aide_core.namespaces import robot
 
 
-class PositionExtractor(AbstractExtractor):
+class PositionExtractor(AbstractPeriodicExtractor):
     MAP_LINK = "/map"
     ROBOT_LINK = "/base_footprint"
     rate = 1
@@ -20,10 +20,12 @@ class PositionExtractor(AbstractExtractor):
         Hurr durr.
         
         """
-        time = self.get_time()
         try:
             ((x, y, _), _) = self.listener.lookupTransform(self.MAP_LINK, self.ROBOT_LINK, rospy.Time(0))
-            return Graph(Triple(robot.self, properties.position_x, x, time),
-                         Triple(robot.self, properties.position_y, y, time))
         except:
             return None
+
+        subj = robot.self
+        subj.position_x = x
+        subj.position_y = y
+        return subj

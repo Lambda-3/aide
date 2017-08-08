@@ -38,9 +38,11 @@ def to_space(name):
 
 def get_doc(something_with_doc, strip_annotations=True):
     try:
-        doc_lines = (x.strip() for x in something_with_doc.__doc__.strip().splitlines())
+        doc_lines = (x.strip()
+                     for x in something_with_doc.__doc__.strip().splitlines())
         if strip_annotations:
-            return "\n".join(line for line in doc_lines if not line.startswith(":"))
+            return "\n".join(
+                line for line in doc_lines if not line.startswith(":"))
         else:
             return "\n".join(doc_lines)
     except:
@@ -75,10 +77,11 @@ def get_type_hints(func):
 
 
 def apply_lint(path):
-    options = """%s --msg-template='{path}({line:3d}:{column:2d}): [{obj}] {msg}' 
-                    --disable=C,R,I""" % path
+    options = """%s --msg-template='{path}({line:3d}:{column:2d}) {msg}' 
+                    --disable=C,R,no-name-in-module""" % path
     out, err = lint.py_run(options, return_std=True)
     return "".join(err.readlines()) + "".join(out.readlines())
+
 
 def format_code(code):
     return FormatCode(code)[0]

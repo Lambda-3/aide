@@ -1,28 +1,90 @@
 import threading
 from abc import ABCMeta, abstractmethod, abstractproperty
+
+import imp
+import aide_core.apis.simple
+import genpy
+import reimport
 import rospy
-from rospy import loginfo
+from rospy import loginfo, logwarn
+from rospy.core import logerror
+from rospy.exceptions import ROSSerializationException
+
+from aide_core.apis.rdf_utils import Graph
 
 
-class AbstractExtractor():
+class AbstractExtractor(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, **kwargs):
+        loginfo("Creating class {}...".format(self.__class__.__name__))
         self.publisher = kwargs['publisher']
+        self.lock = threading.Lock()
         self.register_me()
-
-    @abstractmethod
-    def extract(self, **kwargs):
-        """
-
-        :rtype: mario_messages.msg._RdfGraphStamped.RdfGraphStamped
-        """
-
-        pass
+        self.to_reimport = []
 
     def get_time(self):
-
         return rospy.Time().now()
+
+    def register_me(self):
+        loginfo("Registering thread...")
+        thread = threading.Thread(target=self.run_forever)
+        self._finished = False
+        thread.daemon = True
+        thread.start()
+
+    def publish(self, message):
+        if message:
+            graph = Graph(message)
+            if graph:
+                try:
+                    self.publisher.publish(graph)
+                except ROSSerializationException as e:
+                    logerror(str(e))
+            else:
+                logwarn("{} extracted something that is not publishable!".format(self.__class__.__name__))
+
+    def run_forever(self):
+        loginfo(self.finished)
+        while not self.finished:
+            try:
+                self.loop()
+            except Exception as e:
+                logwarn(str(e))
+                # if self.to_reimport:
+                # self.reimport()
+                # self.reimport()
+                # self.to_reimport = []
+
+    # def set_reimport(self, modules):
+    #     self.to_reimport = modules
+    #
+    # def reimport(self):
+    #     loginfo("REIMPORTING {}".format(self.__class__.__name__))
+    #     loginfo(reimport.modified())
+    #     reimport.reimport('aide_core.apis.simple')
+    #     loginfo(aide_core.apis.simple.fancify_string("asdf"))
+
+    @abstractmethod
+    def loop(self):
+        pass
+
+    @property
+    def finished(self):
+        return self._finished or rospy.is_shutdown()
+
+    def finish(self):
+        loginfo("{} finished.".format(self.__class__.__name__))
+        self._finished = True
+
+
+class AbstractPeriodicExtractor(AbstractExtractor):
+    def __init__(self, **kwargs):
+        super(AbstractPeriodicExtractor, self).__init__(**kwargs)
+
+    @abstractmethod
+    def extract(self):
+        pass
 
     @abstractproperty
     def queue_size(self):
@@ -30,27 +92,16 @@ class AbstractExtractor():
 
     @abstractproperty
     def rate(self):
-        """
-
-        :rtype: int or rospy.Rate
-        """
         pass
 
-    def run_forever(self):
-        while not rospy.is_shutdown():
-            result = (self.extract())
-            if result:
-                self.publisher.publish(result)
-            # rate = rospy.Rate(self.rate) if isinstance(self.rate, int) else self.rate
-            rospy.sleep(self.rate)
-
-    def register_me(self):
-        thread = threading.Thread(target=self.run_forever)
-        thread.daemon = True
-        thread.start()
+    def loop(self):
+        result = self.extract()
+        self.publish(result)
+        rospy.Rate(self.rate).sleep()
+        # rospy.sleep(self.rate)
 
 
-class AbstractTopicExtractor(AbstractExtractor):
+class AbstractTopicExtractor(AbstractPeriodicExtractor):
     def __init__(self, **kwargs):
         super(AbstractTopicExtractor, self).__init__(**kwargs)
         self.new = True
@@ -85,15 +136,13 @@ class AbstractTopicExtractor(AbstractExtractor):
         """
         pass
 
-    def run_forever(self):
-        while not rospy.is_shutdown():
-
+    def loop(self):
+        if getattr(self, 'new', False):
             result = self.extract()
-            if result and self.new:
-                self.publisher.publish(result)
-                self.new = not self.only_new
-            # rate = rospy.Rate(self.rate) if isinstance(self.rate, int) else self.rate
-            rospy.Rate(self.rate).sleep()
+            if result:
+                self.publish(result)
+            self.new = not self.only_new
+        rospy.Rate(self.rate).sleep()
 
     @property
     def message(self):

@@ -1,12 +1,14 @@
-from rospy import loginfo
+import rospy
+from aide_messages.msg import ShortMessage
 
-
-def send_skype_message(to, content):
+__pub = rospy.Publisher("/aide/outgoing_whatsapp_messages", ShortMessage, queue_size=42)
+def send_whatsapp_message(to, content):
     """
     
-    :param to: Person to send the message to.
+    :param to: Whatsapp number to send message to.
     :type to: str
-    :param content: Content of the message. 
-    :type content: str
+    :param content: Content to send.
+    :type content: content.
     """
-    loginfo("Sending message to %s with content %s.", to, content)
+    msg = ShortMessage(type=ShortMessage.WhatsApp, other=to, content=content)
+    __pub.publish(msg)

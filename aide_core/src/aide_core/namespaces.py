@@ -1,16 +1,13 @@
 import sys
-import types
 
 
-class Namespaces(types.ModuleType):
+class Namespaces(object):
     """
     Fake module namespace class.
 
     When using ``from namespaces import foo`` you actually "import" from this class. That is, you call
     ``Namespaces().__getattr__('foo')``. This returns a `NamespaceWrapper` object.
     """
-
-    __all__ = lambda x: x
 
     def __getattr__(self, item):
         """
@@ -110,6 +107,8 @@ class Namespaces(types.ModuleType):
         return NamespaceWrapper()
 
 
+ref = sys.modules[__name__]
 # set this module to the class defined above. This is done so when importing from namespaces you actually "import" from
 # the class
-sys.modules[__name__] = Namespaces(name=__name__)
+sys.modules[__name__] = Namespaces()
+print (__name__)

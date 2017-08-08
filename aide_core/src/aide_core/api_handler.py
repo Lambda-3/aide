@@ -8,10 +8,9 @@ import traceback
 import roslib
 import rospy
 from aide_messages.srv import AddApi, GetAllApis, GetApi
-from pylint import epylint as lint
 from rospy import loginfo
 from rospy.core import logerror, logwarn
-from std_msgs.msg import Bool
+from std_msgs.msg import String
 
 from aide_core import config
 from apis import storage, util
@@ -102,11 +101,12 @@ class ApiHandler:
         self.api_storage.delete_many({"name": name})
 
         loginfo("   Funcs deleted. Adding now.")
-        self.function_storage.insert_many(api_funcs)
-        self.api_storage.insert(api)
+        if api_funcs:
+            self.function_storage.insert_many(api_funcs)
+            self.api_storage.insert(api)
 
         try:
-            self.notify_function()
+            self.notify_function(name)
         except AttributeError:
             logwarn("No notify function set. If you see this message on startup, all is fine.")
         return True, lint_output
@@ -129,9 +129,9 @@ class ApiHandler:
 def main():
     rospy.init_node("api_handler")
     loginfo("Creating api handler...")
-    notify_publisher = rospy.Publisher("/aide/update_apis", Bool, queue_size=50)
+    notify_publisher = rospy.Publisher("/aide/update_apis", String, queue_size=50)
 
-    api = ApiHandler(lambda: notify_publisher.publish(True))
+    api = ApiHandler(lambda x: notify_publisher.publish(x))
     loginfo("Registering services...")
 
     get_service_handler(GetApi).register_service(lambda **args: api.get_api(**args) or ())
@@ -140,8 +140,6 @@ def main():
 
     loginfo("Registered services. Spinning.")
 
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    loginfo(os.getcwd())
     rospy.spin()
 
 

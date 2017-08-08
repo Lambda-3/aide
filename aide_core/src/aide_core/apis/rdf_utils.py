@@ -1,17 +1,24 @@
 import rospy
 from aide_messages.msg import RdfTripleStamped, RdfGraphStamped
-from rdflib import Literal, XSD, Namespace, RDF
+from rdflib import Literal, XSD, Namespace
 
 from rdflib.term import URIRef
+from rospy.core import logerror, loginfo
 
-# namespaces TODO: do it more generically
-speech = Namespace("http://lambda3.org/aide/speech/")
 properties = Namespace("http://lambda3.org/aide/properties/")
-robot = Namespace("http://lambda3.org/aide/self/")
-rdf = RDF
 classes = Namespace("http://lambda3.org/aide/classes/")
-def Graph(*triples):
-    return RdfGraphStamped(triples)
+
+
+def Graph(*args):
+    list_of_subjects = all(getattr(r, "_is_subject", False) for r in args)
+    if list_of_subjects:
+        return RdfGraphStamped(*(arg.to_rdf_triples() for arg in args))
+    try:
+        return RdfGraphStamped(args)
+    except TypeError as e:
+        logerror(str(e))
+
+        return None
 
 
 def Triple(subject, predicate, object, time=None):
@@ -20,12 +27,25 @@ def Triple(subject, predicate, object, time=None):
     :type predicate: rdflib.term.URIRef
     :type subject: rdflib.term.URIRef
     """
-    return RdfTripleStamped(subject.toPython(), predicate.toPython(), literalize(object), time or rospy.Time.now())
+    return RdfTripleStamped(subject.toPython(), predicate.toPython(), literal_to_string(object), time or rospy.Time.now())
 
 
-def literalize(literal):
+def literal_to_string(literal):
     if isinstance(literal, URIRef):
         return literal.toPython()
     literal = Literal(literal)
     datatype = literal.datatype or XSD.string
     return "{}^^{}".format(literal, datatype)
+
+
+def string_to_literal(string, to_uri=True):
+    if "^^http://www.w3.org/2001/XMLSchema#" in string:
+        try:
+            value, datatype = string.split("^^")
+            return Literal(value, datatype=datatype)
+        except:
+            loginfo("Could not deliteralize string.")
+            return Literal(string)
+    else:
+        loginfo("not a literal")
+        return URIRef(string) if to_uri else string

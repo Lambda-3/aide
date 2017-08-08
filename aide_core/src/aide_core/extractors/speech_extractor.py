@@ -1,31 +1,32 @@
-import threading
-from uuid import uuid4 as uuid
-
-import rospy
 from speech_recognition import Microphone, Recognizer, UnknownValueError, RequestError
 
-from aide_core.apis import Graph, Triple, speech, properties
+from aide_core.extractors import AbstractExtractor
+from aide_core.namespaces import speech
 
 
-class SpeechExtractor(object):
+class SpeechExtractor(AbstractExtractor):
     queue_size = 42
 
-    def __init__(self, publisher):
-        self.publisher = publisher
+    def __init__(self, **kwargs):
+        super(SpeechExtractor, self).__init__(**kwargs)
         self.recognizer = Recognizer()
-        thread = threading.Thread(target=self.run_forever)
-        thread.daemon = True
-        thread.start()
+        self.adjusted = False
 
     # obtain audio from the microphone
-    def run_forever(self):
-        while not rospy.is_shutdown():
-            with Microphone() as source:
-                # r.adjust_for_ambient_noise(source)
-                audio = self.recognizer.listen(source)
-                text = self.process_audio(audio)
-                if text:
-                    self.publisher.publish(Graph(Triple(speech[uuid().hex], properties.speech, text)))
+    def loop(self):
+        with Microphone() as source:
+            if not self.adjusted:
+                self.recognizer.adjust_for_ambient_noise(source)
+                self.adjusted = True
+
+            audio = self.recognizer.listen(source)
+
+            text = self.process_audio(audio)
+
+            if text:
+                subj = speech._
+                subj.speechContent = text
+                self.publish(subj)
 
     def process_audio(self, audio):
         """

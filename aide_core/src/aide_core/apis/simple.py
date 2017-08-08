@@ -1,5 +1,5 @@
 def fancify_string(string):
-    return "utterly fancy {}".format(string)
+    return "~^-_*~ {} ~*-_^~".format(string)
 
 
 def simple_add(one, other):

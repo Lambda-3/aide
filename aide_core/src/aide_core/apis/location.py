@@ -28,6 +28,8 @@ def get_location():
         'considerIp': 'true',
         'wifiAccessPoints': wifi_stations
     }
+
+
     headers = {
         'content-type': "application/json"
     }
