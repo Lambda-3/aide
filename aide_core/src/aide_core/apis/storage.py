@@ -17,6 +17,8 @@ class CollectionWrapper(object):
 
     delete_many = lambda self, *args, **kwargs: partial(delete_many, collection=self.collection)(*args, **kwargs)
 
+    delete_one = lambda self, *args, **kwargs: partial(delete_one, collection=self.collection)(*args, **kwargs)
+
     insert = lambda self, *args, **kwargs: partial(insert, collection=self.collection)(*args, **kwargs)
 
     insert_many = lambda self, *args, **kwargs: partial(insert_many, collection=self.collection)(*args, **kwargs)
@@ -39,6 +41,11 @@ def get_collection(name=None, indices=list()):
 
 
 def delete_many(where, collection=None, *args, **kwargs):
+    collection = _cure_args(collection)
+    __client.db[collection].delete_many(filter=where, *args, **kwargs)
+
+
+def delete_one(where, collection=None, *args, **kwargs):
     collection = _cure_args(collection)
     __client.db[collection].delete_many(filter=where, *args, **kwargs)
 
