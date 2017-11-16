@@ -1,6 +1,5 @@
 from aide_core.namespaces import robot
 from std_msgs.msg import String
-from aide_core.apis.simple import fancify_string
 from aide_core.extractors import AbstractTopicExtractor
 
 
@@ -10,8 +9,8 @@ class InputExtractor(AbstractTopicExtractor):
     queue_size = 43
     rate = 2
 
-    def extract(self):
-        split_args = self.message.data.split(" ")
+    def extract_from_message(self, message):
+        split_args = message.data.split(" ")
 
         command = split_args[0]
         args = split_args[1:]

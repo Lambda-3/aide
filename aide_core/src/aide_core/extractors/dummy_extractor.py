@@ -19,5 +19,4 @@ class DummyExtractor(AbstractPeriodicExtractor):
         subj = robot.self
         subj.random = random.randint(0, 100)
         subj.random2 = simple.fancify_string("SDF")
-        # subj.random3 = fancify_string("This must be the stupidest thing i've ever heard in my life.")
         return subj

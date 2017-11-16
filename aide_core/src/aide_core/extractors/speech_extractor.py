@@ -7,8 +7,7 @@ from aide_core.namespaces import speech
 class SpeechExtractor(AbstractExtractor):
     queue_size = 42
 
-    def __init__(self, **kwargs):
-        super(SpeechExtractor, self).__init__(**kwargs)
+    def initialize(self):
         self.recognizer = Recognizer()
         self.adjusted = False
 

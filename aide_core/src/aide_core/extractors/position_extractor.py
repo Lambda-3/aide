@@ -11,8 +11,7 @@ class PositionExtractor(AbstractPeriodicExtractor):
     rate = 1
     queue_size = 42
 
-    def __init__(self, **kwargs):
-        super(PositionExtractor, self).__init__(**kwargs)
+    def initialize(self):
         self.listener = TransformListener()
 
     def extract(self):
