@@ -9,6 +9,7 @@ import reimport as reimport
 import roslib
 import rospy
 from aide_messages.srv import (CallFunction, AddActionProvider, GetAllActionProviders, GetActionProvider)
+from aide_messages.srv._DeleteActionProvider import DeleteActionProvider
 from rospy import loginfo
 from rospy.core import logerror
 from std_msgs.msg import Bool, String
@@ -20,8 +21,8 @@ from aide_core import config
 from apis.ros_services import get_service_handler
 
 roslib.load_manifest("aide_core")
-apis.__update()
-actions.__update()
+apis._update()
+actions._update()
 
 
 class ActionHandler:
@@ -54,7 +55,11 @@ class ActionHandler:
         #     if not module == "__main__":
         #         loginfo("Module {} changed. reloading...".format(module))
         loginfo("Reloading {}".format(name))
-        reimport.reimport('aide_core.apis.{}'.format(name))
+        try:
+            reimport.reimport('aide_core.apis.{}'.format(name))
+        except ValueError:
+            apis._update()
+            reimport.reimport('aide_core.apis.{}'.format(name))
 
     def add_action_provider(self, name, file_content, loading=False):
         loginfo("Adding action provider %s" % name)
@@ -137,7 +142,18 @@ class ActionHandler:
         except KeyError:
             raise ValueError("There is no function {} in api {}!".format(func, api))
 
-    def get_all_actions_providers(self):
+    def remove_action_provider(self, name):
+        if name not in self.get_all_action_providers():
+            return False
+
+        os.remove("{}/{}.py".format(config.ACTION_PROVIDERS_PATH, name))
+
+        self.api_storage.delete_one({"name": name})
+        self.function_storage.delete_many({"api": name})
+
+        return True
+
+    def get_all_action_providers(self):
         return [action_provider_path.rsplit("/", 1)[-1].rsplit(".py", 1)[-2] for action_provider_path in
                 self.get_all_action_provider_files()]
 
@@ -166,8 +182,9 @@ def main():
     rospy.Subscriber("/aide/update_apis", String, lambda x: action_handler.reload_api_references(x.data))
 
     get_service_handler(GetActionProvider).register_service(lambda name: action_handler.get_action_provider(name) or ())
-    get_service_handler(GetAllActionProviders).register_service(action_handler.get_all_actions_providers)
+    get_service_handler(GetAllActionProviders).register_service(action_handler.get_all_action_providers)
     get_service_handler(AddActionProvider).register_service(action_handler.add_action_provider)
+    get_service_handler(DeleteActionProvider).register_service(action_handler.remove_action_provider)
 
     loginfo("Registered services. Spinning.")
 

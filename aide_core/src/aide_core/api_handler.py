@@ -7,7 +7,7 @@ import traceback
 
 import roslib
 import rospy
-from aide_messages.srv import AddApi, GetAllApis, GetApi
+from aide_messages.srv import AddApi, GetAllApis, GetApi, DeleteApi
 from rospy import loginfo
 from rospy.core import logerror, logwarn
 from std_msgs.msg import String
@@ -111,6 +111,16 @@ class ApiHandler:
             logwarn("No notify function set. If you see this message on startup, all is fine.")
         return True, lint_output
 
+    def remove_api(self, name):
+        if name not in self.get_all_apis():
+            return False
+
+        os.remove("{}/{}.py".format(config.APIS_PATH, name))
+
+        self.api_storage.delete_one({"name": name})
+        self.function_storage.delete_many({"api": name})
+        return True
+
     def get_all_apis(self):
         return [api_path.rsplit("/", 1)[-1].rsplit(".py", 1)[-2] for api_path in self.get_all_api_files()]
 
@@ -137,6 +147,7 @@ def main():
     get_service_handler(GetApi).register_service(lambda **args: api.get_api(**args) or ())
     get_service_handler(GetAllApis).register_service(api.get_all_apis)
     get_service_handler(AddApi).register_service(api.add_api)
+    get_service_handler(DeleteApi).register_service(api.remove_api)
 
     loginfo("Registered services. Spinning.")
 

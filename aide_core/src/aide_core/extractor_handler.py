@@ -9,11 +9,13 @@ import reimport
 import roslib
 import rospy
 from aide_messages.msg import RdfGraphStamped
+from aide_core import apis
 from aide_messages.srv import GetAllExtractors, AddExtractor
+from aide_messages.srv._DeleteExtractor import DeleteExtractor
 from aide_messages.srv._GetExtractor import GetExtractor
 from rospy import loginfo
 from rospy.core import logerror
-from std_msgs.msg import Bool, String
+from std_msgs.msg import  String
 
 from aide_core import config
 from aide_core.apis import util
@@ -48,7 +50,11 @@ class ExtractorHandler(object):
         #             loginfo("Module {} changed. reloading...".format(module))
         #             reimport.reimport(module)
         loginfo("Reloading {}".format(name))
-        reimport.reimport('aide_core.apis.{}'.format(name))
+        try:
+            reimport.reimport('aide_core.apis.{}'.format(name))
+        except ValueError:
+            apis._update()
+            reimport.reimport('aide_core.apis.{}'.format(name))
 
     def get_extractor(self, name):
         try:
@@ -79,6 +85,7 @@ class ExtractorHandler(object):
         # subscriber = rospy.Subscriber(extractor.from_channel, extractor.type, callback)
 
         self.extractors[name] = extractor
+        loginfo(self.extractors)
 
     def add_extractor(self, name, file_content, loading=False):
         class_name = re.findall("class\s+(.*?)[\(,:]", file_content)[0]
@@ -123,6 +130,19 @@ class ExtractorHandler(object):
     def get_all_extractors(self):
         return [api_path.rsplit("/", 1)[-1].rsplit(".py", 1)[-2] for api_path in self.get_all_extractor_files()]
 
+    def remove_extractor(self, name):
+        if name not in self.get_all_extractors():
+            return False
+
+        file_content = self.get_extractor(name)
+        class_name = re.findall("class\s+(.*?)[\(,:]", file_content)[0]
+
+        extractor = self.extractors.pop(class_name, None)
+        extractor.finish()
+
+        os.remove("{}/{}.py".format(config.EXTRACTORS_PATH, name))
+        return True
+
     def get_all_extractor_files(self):
         """
 
@@ -149,6 +169,7 @@ if __name__ == '__main__':
     get_service_handler(GetExtractor).register_service(lambda name: extractor_handler.get_extractor(name) or ())
     get_service_handler(GetAllExtractors).register_service(extractor_handler.get_all_extractors)
     get_service_handler(AddExtractor).register_service(extractor_handler.add_extractor)
+    get_service_handler(DeleteExtractor).register_service(extractor_handler.remove_extractor)
 
     loginfo("Registered services. Spinning.")
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import importlib
 import json
 import threading
 
@@ -6,9 +7,8 @@ import aide_messages
 import roslib
 import rospy
 from aide_messages.msg import FiredEvent, Event
-from aide_messages.srv import CallFunction, AddEvent, AddRule, GetAllRoutines, GetAllEvents
-from aide_messages.srv._GetEvent import GetEvent
-from aide_messages.srv._GetRoutine import GetRoutine
+from aide_messages.srv import CallFunction, AddEvent, AddRule, GetAllRoutines, GetAllEvents, GetRoutine, GetEvent
+from aide_messages.srv._DeleteRoutine import DeleteRoutine
 from rospy import loginfo
 from rospy.core import logwarn
 
@@ -21,6 +21,28 @@ call = get_service_handler(CallFunction).get_service()
 register_event = get_service_handler(AddEvent).get_service()
 
 
+def parse_steps(steps):
+    """
+
+    """
+    result = []
+    for step in steps:
+        loginfo("Parsing step {}".format(step))
+        if isinstance(step, Step):
+            result.append(Step)
+        else:
+            try:
+                dct = step
+                Class = eval(dct['type'])
+            except TypeError:
+                dct = json.loads(step)
+                Class = eval(dct['type'])
+
+            result.append(Class(**{k: v for k, v in dct.items() if not k == 'type'}))
+    loginfo("Execution steps: {}".format(result))
+    return result
+
+
 class Step(object):
     def __repr__(self):
         return "{class_name}({attributes})".format(
@@ -30,29 +52,34 @@ class Step(object):
 
 
 class Execute(Step):
-    def __init__(self, function, mapping=None, literals=None):
+    def __init__(self, function, mapping=None, literals=None, funcs=None):
         self.what = function
         self.mapping = mapping or dict()
         # self.parametrized = True if mapping else False
         self.literals = literals or dict()
+        self.funcs = funcs or dict()
 
     def fill_parameters(self, params):
         """
 
         :type params: dict
         """
+        # insert parameters mappings as arguments
         for argument_name, parameter_name in self.mapping.items():
             self.literals[argument_name] = params[parameter_name]
-        for name, value in self.literals.items():
-            loginfo("sanitizing {}: {}".format(name, value))
-            try:
-                self.literals[name] = value.format(**params)
-            except AttributeError:
-                # if it's not string, just don't do anything
-                pass
+        # evaluate functions as arguments
+        for argument, func in self.funcs.items():
+            api, name = func['function'].split(".", 2)
+            actual_func = importlib.import_module("apis.{}".format(api, func)).__dict__[name]
+
+            for arg_name, param_name in func['mapping'].items():
+                func['literals'][arg_name] = params[param_name]
+
+            self.literals[argument] = actual_func(**func['literals'])
 
     def execute(self):
         loginfo("Executing function {} with arguments {}".format(self.what, self.literals))
+
         call(self.what, json.dumps(self.literals))
 
 
@@ -65,7 +92,7 @@ class RepeatUntil(Step):
     def __init__(self, wait_for, execute_steps, rate=1):
         if not isinstance(execute_steps, list):
             execute_steps = [execute_steps]
-        self.execute_steps = execute_steps
+        self.execute_steps = parse_steps(execute_steps)
         self.event_name = wait_for
         self.rate = rospy.Rate(rate)
 
@@ -78,33 +105,19 @@ class Routine(object):
         self.name = name
         self.description = description
         self.trigger_name = trigger_name
-        self.execution_steps = self.parse_steps(execution_steps)
+        self.execution_steps = parse_steps(execution_steps)
         self.running = False
         self.waiting_for = None
         self.waiting_event = None
         self.waiting_for_lock = threading.Lock()
         self.event_notifier = event_notifier
+        self.shutdown = False
 
-    def parse_steps(self, steps):
-        """
-
-        """
-        result = []
-        for step in steps:
-            loginfo("Parsing step {}".format(step))
-            if isinstance(step, Step):
-                result.append(Step)
-            else:
-                try:
-                    dct = step
-                    Class = eval(dct['type'])
-                except TypeError:
-                    dct = json.loads(step)
-                    Class = eval(dct['type'])
-
-                result.append(Class(**{k: v for k, v in dct.items() if not k == 'type'}))
-        loginfo("Execution steps: {}".format(result))
-        return result
+    def unregister(self):
+        self.shutdown = True
+        with self.waiting_for_lock:
+            if self.waiting_for != None:
+                self.waiting_event.set()
 
     def check_triggered_by(self, event):
         """
@@ -121,6 +134,10 @@ class Routine(object):
         loginfo("Routine {} triggered.".format(self.name))
         self.running = True
         for step in self.execution_steps:
+            if self.shutdown:
+                self.running = False
+                return
+
             if (isinstance(step, Execute)):
                 step.fill_parameters(self.params)
                 step.execute()
@@ -144,12 +161,13 @@ class Routine(object):
                 loginfo("Waiting for event {}...".format(step.event_name, str(self.params)))
                 self.event_notifier.add_to_waiting(self, self.waiting_for)
                 self.waiting_event = threading.Event()
-                while self.waiting_event.is_set():
+
+                while not self.waiting_event.is_set():
                     for execute_step in step.execute_steps:
                         execute_step.execute()
 
-                self.waiting_for = None
                 self.event_notifier.remove_from_waiting(self, self.waiting_for)
+                self.waiting_for = None
                 loginfo("{} is done waiting.".format(self.name))
                 self.waiting_event = None
 
@@ -249,16 +267,30 @@ class EventHandler(object):
 
     def get_event(self, name):
         loginfo("Getting event {}".format(name))
-        return self.event_storage.find_one({"name": name})
-
-    def get_routine(self, name):
-        return self.routine_storage.find_one({"name": name})
-
-    def get_all_routines(self):
-        return self.routine_storage.find({})
+        result = self.event_storage.find_one(where={"name": name}, select_only=get_slots(aide_messages.msg.Event))
+        return result or {}
 
     def get_all_events(self):
         return self.event_storage.find({})
+
+    def get_routine(self, name):
+        return self.routine_storage.find_one(where={"name": name}, select_only=get_slots(aide_messages.msg.Routine))
+
+    def delete_routine(self, name):
+        result = self.routine_storage.find_one(where={"name": name}, select_only=get_slots(aide_messages.msg.Routine))
+        # routine exists
+        if result:
+            loginfo("Deleting routine {}".format(name))
+            idx = self.routines.index(Routine(event_notifier=self.event_notifier, **result))
+            routine = self.routines.pop(idx)
+            routine.unregister()
+            self.routine_storage.delete_one(where={"name": name})
+            return True
+        else:
+            return False
+
+    def get_all_routines(self):
+        return self.routine_storage.find({})
 
     def add_rule(self, routine, events):
         """
@@ -275,7 +307,9 @@ class EventHandler(object):
 
         :type event: aide_messages.msg.Event
         """
-        event.sparqlWhere = "{{{}}}".format(event.sparqlWhere)
+        if not event.sparqlWhere.startswith("{") and event.sparqlWhere.endswith("}"):
+            # if not enclosed in braces, do so
+            event.sparqlWhere = "{{{}}}".format(event.sparqlWhere)
         result = self.event_storage.find_one(where={"name": event.name})
         if result:
             loginfo("Event with this name already exists...")
@@ -331,6 +365,7 @@ if __name__ == '__main__':
     get_service_handler(GetAllRoutines).register_service(event_handler.get_all_routines)
     get_service_handler(GetRoutine).register_service(lambda name: event_handler.get_routine(name))
     get_service_handler(GetEvent).register_service(lambda name: event_handler.get_event(name) or ())
+    get_service_handler(DeleteRoutine).register_service(event_handler.delete_routine)
 
     get_service_handler(GetAllEvents).register_service(event_handler.get_all_events)
     loginfo("Registered services. Spinning.")

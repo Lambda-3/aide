@@ -6,12 +6,14 @@ import rospy
 from aide_messages.msg import Routine, Event
 from aide_messages.srv import (AddRule, GetApi, GetAllApis, GetActionProvider, GetAllActionProviders,
                                AddActionProvider, AddExtractor, GetAllExtractors, GetExtractor, GetAllRoutines,
-                               GetEvent, GetAllEvents, AddApi, GetRoutine)
+                               GetEvent, GetAllEvents, AddApi, GetRoutine, DeleteApi, DeleteExtractor,
+                               DeleteActionProvider)
+from aide_messages.srv._DeleteRoutine import DeleteRoutine
 from enum import Enum
 from flask import Flask
 from flask_cors import CORS
 from flask_restful import Api, reqparse, Resource, abort, marshal
-from rospy import loginfo, logdebug
+from rospy import loginfo, logdebug, logwarn
 
 from aide_core.apis import query_proposals
 from apis import approximate
@@ -23,6 +25,7 @@ from rospy_message_converter.message_converter import convert_ros_message_to_dic
 roslib.load_manifest("aide_core")
 
 query_proposals.__init()
+
 
 def parse_api():
     parser = reqparse.RequestParser()
@@ -82,7 +85,8 @@ def parse_rule():
 class ResourceEnum(Enum):
     ActionProvider = {
         "get": get_service_handler(GetActionProvider).call_service,
-        "path": "/aide/action_providers/<string:name>"
+        "path": "/aide/action_providers/<string:name>",
+        "delete": get_service_handler(DeleteActionProvider).call_service
     }
     ActionProviders = {
         "post": get_service_handler(AddActionProvider).call_service,
@@ -92,7 +96,8 @@ class ResourceEnum(Enum):
 
     Extractor = {
         "get": get_service_handler(GetExtractor).call_service,
-        "path": "/aide/extractors/<string:name>"
+        "path": "/aide/extractors/<string:name>",
+        "delete": get_service_handler(DeleteExtractor).call_service
     }
     Extractors = {
         "post": get_service_handler(AddExtractor).call_service,
@@ -102,7 +107,8 @@ class ResourceEnum(Enum):
 
     Api = {
         "get": get_service_handler(GetApi).call_service,
-        "path": "/aide/apis/<string:name>"
+        "path": "/aide/apis/<string:name>",
+        "delete": get_service_handler(DeleteApi).call_service
     }
     Apis = {
         "post": get_service_handler(AddApi).call_service,
@@ -112,7 +118,8 @@ class ResourceEnum(Enum):
 
     Routine = {
         "get": get_service_handler(GetRoutine).call_service,
-        "path": "/aide/routines/<string:name>"
+        "path": "/aide/routines/<string:name>",
+        "delete": get_service_handler(DeleteRoutine).call_service
     }
 
     Routines = {
@@ -137,6 +144,7 @@ class ResourceEnum(Enum):
     Rules = {
         "post": lambda **args: get_service_handler(AddRule).call_service(**args),
         "validate_input": parse_rule,
+        "envelope": "success"
     }
 
     Related = {
@@ -158,18 +166,6 @@ class ResourceEnum(Enum):
 
     }
 
-    #
-    # ClassProposals = {
-    #     "path"        : ("/aide/classes/<string:subject>/related/<int:top_k>",
-    #                      "/aide/classes/<string:subject>/related/"),
-    #     "get"         : (lambda subject, top_k=3: completer.get_subject_from_plaintext(subject)),
-    #     "marshal_with": {
-    #         "instance": fields.String,
-    #         "class"   : fields.String
-    #     },
-    #     "envelope"    : "classes"
-    # }
-
     def validate_input(self):
         return self.value['validate_input']()
 
@@ -184,6 +180,12 @@ class ResourceEnum(Enum):
 
     def post(self, *args, **kwargs):
         return self.value["post"](*args, **kwargs)
+
+    def has_delete(self):
+        return "delete" in self.value
+
+    def delete(self, *args, **kwargs):
+        return self.value["delete"](*args, **kwargs)
 
     def path(self):
         """
@@ -298,6 +300,28 @@ def build_resources(api):
                     handle_exception(e)
 
             class_dict["get"] = get
+
+        if definition.has_delete():
+            loginfo("{} has delete, creating delete function".format(name))
+
+            def delete(self, rsc=definition, *args, **kwargs):
+                """
+                Delete method of the resource to be created.
+
+                :param self: Reference to the object this function is later bound to.
+                :param rsc: Never touch this! This is for early binding purposes only.
+                :param args: Positional arguments, given through to the defined get function.
+                :param kwargs: Keyword arguments, given through to the defined get function.
+                :return:
+                """
+                loginfo("DELETE request on {} with args {}".format(self.__class__, str(kwargs)))
+                try:
+                    result = rsc.delete(*args, **kwargs)
+                    return handle_result(result, rsc)
+                except rospy.ServiceException as e:
+                    handle_exception(e)
+
+            class_dict["delete"] = delete
 
         # Create the class dynamically with previously defined functions
         GeneratedResource = type(str(definition.name), (Resource,), class_dict)
