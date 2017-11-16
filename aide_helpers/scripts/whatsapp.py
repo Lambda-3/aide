@@ -3,11 +3,12 @@ import atexit
 import threading
 
 import roslib
+import unicodedata
 from rospy import loginfo
 
 import rospy
 
-from aide_messages.msg import ShortMessage
+from aide_messages.msg import ShortMessage, sys
 from aide_core import credentials
 from yowsup.layers.interface import YowInterfaceLayer, ProtocolEntityCallback
 from yowsup.layers.protocol_chatstate.protocolentities import OutgoingChatstateProtocolEntity, ChatstateProtocolEntity
@@ -20,7 +21,6 @@ from yowsup.layers.network import YowNetworkLayer
 
 roslib.load_manifest('aide_helpers')
 
-
 class AideRosLayer(YowInterfaceLayer):
     def __init__(self):
         super(AideRosLayer, self).__init__()
@@ -31,8 +31,8 @@ class AideRosLayer(YowInterfaceLayer):
     @ProtocolEntityCallback("message")
     def onMessage(self, message):
         # send receipt otherwise we keep receiving the same message over and over
-
-        loginfo("Incoming message...\n{}".format(message))
+        message.body = unicodedata.normalize("NFKD", message.body).encode('ascii','ignore')
+        loginfo(u"Incoming message...\n{}".format(message))
         receipt = OutgoingReceiptProtocolEntity(message.getId(), message.getFrom(),
                                                 'read', message.getParticipant())
         self.toLower(receipt)
