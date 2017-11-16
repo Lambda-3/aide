@@ -1,9 +1,11 @@
 import inspect
 
+from aide_messages.msg import Event
 from apis import storage
 from enum import Enum
 from rospy import loginfo
 
+from aide_core.apis import ros_services
 from aide_core.apis.util import camel_case_to_underscore, underscore_to_camel_case
 
 
@@ -34,13 +36,13 @@ def create(**params):
 class Types(Enum):
     Apis = create()
 
-    ApiFuncs = create(select_only=["api", "name", "args", "hinted_args"], word_format="{api} {name}")
+    ApiFuncs = create(select_only=["api", "doc", "name", "args", "hinted_args"], word_format="{api} {name}")
 
     Actions = create()
 
-    ActionFuncs = create(select_only=["api", "name", "args", "hinted_args"], word_format="{api} {name}")
+    ActionFuncs = create(select_only=["api", "doc", "name", "args", "hinted_args"], word_format="{api} {name}")
 
-    Events = create(select_only=["name", "params"])
+    Events = create(select_only=ros_services.get_slots(Event))
 
     Routines = create()
     

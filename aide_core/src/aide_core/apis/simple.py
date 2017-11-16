@@ -1,4 +1,11 @@
 def fancify_string(string):
+    """
+    
+    :param string: String to be fancified.
+    :type string: str
+    :rtype: str
+    """
+    
     return "~^-_*~ {} ~*-_^~".format(string)
 
 

@@ -8,6 +8,7 @@ def get_random_joke():
         'content-type': "application/json"
     }
 
+
     response = requests.request("GET", ENDPOINT, headers=headers)
 
     response.raise_for_status()

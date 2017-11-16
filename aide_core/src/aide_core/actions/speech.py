@@ -1,11 +1,24 @@
-import sound_play
-import sound_play.libsoundplay
-from sound_play.libsoundplay import SoundClient
+import subprocess
+import os
+
+try:
+    from sound_play.libsoundplay import SoundClient
+    _sound_play = True
+except ImportError:
+    _sound_play = False
 
 
 def say(text):
-    _say(str(text))
-    # os.system('espeak "{}" 2> /dev/null'.format(text))
+    # if sound_play exists
+    if _sound_play:
+        _say(str(text))
+    else:
+        # try espeak
+        try:
+            subprocess.call(['espeak', str(text)], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
+        except OSError:
+            # if espeak doesnt exist, just print the text
+            print(text)
 
 
 def pprint(text):

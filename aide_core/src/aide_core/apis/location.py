@@ -25,7 +25,7 @@ def get_location():
     ]
 
     data = {
-        'considerIp': 'true',
+        'considerIp': 'true', # if no wifi stations are found, use ip for determination. yields worse results
         'wifiAccessPoints': wifi_stations
     }
 
@@ -44,4 +44,4 @@ def get_location():
 
 def get_location_human_readable():
     location = get_location()
-    return """You are at {lat:.2f} latitude and {lng:.2f} longitude.""".format(**location)
+    return """I am at {lat:.2f} latitude and {lng:.2f} longitude.""".format(**location)
