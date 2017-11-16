@@ -46,6 +46,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
+  AirConditionerMessage.msg
   Event.msg
   FiredEvent.msg
   Function.msg
@@ -70,6 +71,10 @@ add_service_files(
   AddRule.srv
   AddSpeech.srv
   CallFunction.srv
+  DeleteActionProvider.srv
+  DeleteApi.srv
+  DeleteExtractor.srv
+  DeleteRoutine.srv
   GetActionProvider.srv
   GetAllActionProviders.srv
   GetAllApis.srv
