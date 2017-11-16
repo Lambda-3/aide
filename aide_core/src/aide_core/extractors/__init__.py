@@ -22,6 +22,10 @@ class AbstractExtractor(object):
         self.lock = threading.Lock()
         self.register_me()
         self.to_reimport = []
+        self.initialize()
+
+    def initialize(self):
+        pass
 
     def get_time(self):
         return rospy.Time().now()
@@ -35,7 +39,7 @@ class AbstractExtractor(object):
 
     def publish(self, message):
         if message:
-            graph = Graph(message)
+            graph = Graph(*message)
             if graph:
                 try:
                     self.publisher.publish(graph)
@@ -50,7 +54,8 @@ class AbstractExtractor(object):
             try:
                 self.loop()
             except Exception as e:
-                logwarn(str(e))
+                logwarn("ERROR")
+                rospy.Rate(1).sleep()
                 # if self.to_reimport:
                 # self.reimport()
                 # self.reimport()
@@ -96,7 +101,9 @@ class AbstractPeriodicExtractor(AbstractExtractor):
 
     def loop(self):
         result = self.extract()
+        loginfo("got result")
         self.publish(result)
+        loginfo("result published")
         rospy.Rate(self.rate).sleep()
         # rospy.sleep(self.rate)
 
@@ -111,6 +118,10 @@ class AbstractTopicExtractor(AbstractPeriodicExtractor):
             self.new = True
 
         self.subscriber = rospy.Subscriber(self.from_channel, self.type, set_msg)
+
+    @property
+    def queue_size(self):
+        return 42
 
     @abstractproperty
     def from_channel(self):
@@ -135,6 +146,12 @@ class AbstractTopicExtractor(AbstractPeriodicExtractor):
         :rtype: genpy.Message
         """
         pass
+    @abstractmethod
+    def extract_from_message(self, message):
+        pass
+
+    def extract(self):
+        return self.extract_from_message(self.message)
 
     def loop(self):
         if getattr(self, 'new', False):
