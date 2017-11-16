@@ -53,7 +53,10 @@ class QueryProposal(object):
     def get_sparql(self):
         result = []
         subj_name = "?s" if not self.single else self.entity
-        lit_name = "?{}".format(self.range.rsplit("XMLSchema#")[1])
+        try:
+            lit_name = "?{}{}".format(self.property.rsplit("/",1)[1], self.range.rsplit("XMLSchema#")[1].capitalize())
+        except IndexError:
+            lit_name = "?{}".format(self.property.rsplit("/",1)[-1])
         if self.explicit_class:
             result.append({
                 "subject": subj_name,
