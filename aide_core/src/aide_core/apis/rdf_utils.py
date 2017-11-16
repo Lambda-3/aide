@@ -12,7 +12,10 @@ classes = Namespace("http://lambda3.org/aide/classes/")
 def Graph(*args):
     list_of_subjects = all(getattr(r, "_is_subject", False) for r in args)
     if list_of_subjects:
-        return RdfGraphStamped(*(arg.to_rdf_triples() for arg in args))
+        loginfo("Is a list of subjects")
+        triples_list = [triple for tpl in args for triple in tpl.to_rdf_triples()]
+        loginfo(type(triples_list[0]))
+        return RdfGraphStamped(triples_list)
     try:
         return RdfGraphStamped(args)
     except TypeError as e:
@@ -27,7 +30,8 @@ def Triple(subject, predicate, object, time=None):
     :type predicate: rdflib.term.URIRef
     :type subject: rdflib.term.URIRef
     """
-    return RdfTripleStamped(subject.toPython(), predicate.toPython(), literal_to_string(object), time or rospy.Time.now())
+    return RdfTripleStamped(subject.toPython(), predicate.toPython(), literal_to_string(object),
+                            time or rospy.Time.now())
 
 
 def literal_to_string(literal):
