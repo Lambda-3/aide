@@ -1,4 +1,4 @@
-def __update():
+def _update():
     import os
     import sys
     import importlib

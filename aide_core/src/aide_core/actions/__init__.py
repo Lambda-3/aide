@@ -1,4 +1,4 @@
-def __update():
+def _update():
     import os
     from aide_core import config
     api_files = []
