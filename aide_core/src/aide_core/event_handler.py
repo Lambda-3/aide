@@ -4,21 +4,27 @@ import json
 import threading
 
 import aide_messages
+import reimport
 import roslib
 import rospy
-from aide_messages.msg import FiredEvent, Event
-from aide_messages.srv import CallFunction, AddEvent, AddRule, GetAllRoutines, GetAllEvents, GetRoutine, GetEvent
+from aide_messages.msg import FiredEvent, EventListener
+from aide_messages.srv import (CallFunction, AddEventListener, RemoveEventListener, AddRule, GetAllRoutines,
+                               GetAllEventListeners, GetRoutine, GetEventListener)
 from aide_messages.srv._DeleteRoutine import DeleteRoutine
 from rospy import loginfo
 from rospy.core import logwarn
+from rosservice import ROSServiceException
+from std_msgs.msg import String
 
+import apis
 from apis import storage
 from apis.ros_services import get_service_handler, get_slots
 from rospy_message_converter.message_converter import convert_ros_message_to_dictionary as rtd
 
 roslib.load_manifest("aide_core")
 call = get_service_handler(CallFunction).get_service()
-register_event = get_service_handler(AddEvent).get_service()
+register_event_listener = get_service_handler(AddEventListener).get_service()
+unregister_event_listener = get_service_handler(RemoveEventListener).get_service()
 
 
 def parse_steps(steps):
@@ -124,7 +130,7 @@ class Routine(object):
 
         :type event: Event
         """
-        if self.trigger_name == event.name:
+        if self.trigger_name == event.name and not self.running:
             loginfo("Event {} triggered routine {}".format(event.name, self.name))
             self.params = event.params
             threading.Thread(target=self.trigger).start()
@@ -165,6 +171,7 @@ class Routine(object):
                 while not self.waiting_event.is_set():
                     for execute_step in step.execute_steps:
                         execute_step.execute()
+                        step.rate.sleep()
 
                 self.event_notifier.remove_from_waiting(self, self.waiting_for)
                 self.waiting_for = None
@@ -240,13 +247,24 @@ class WaitingRoutinesHandler(object):
 class EventHandler(object):
     def __init__(self):
         self.event_notifier = WaitingRoutinesHandler()
-        self.event_storage = storage.get_collection("events")
+        self.event_listeners_storage = storage.get_collection("event_listeners")
         self.routine_storage = storage.get_collection("routines")
         self.routines = []
         self.load_routines()
-        self.load_events()
+        self.load_event_listeners()
         storage.get_collection(name="routines", indices=["name"])
         storage.get_collection(name="events", indices=["name"])
+
+    def reload_api_references(self, name):
+        # for module in reimport.modified(config.APIS_PATH):
+        #     if not module == "__main__":
+        #         loginfo("Module {} changed. reloading...".format(module))
+        loginfo("Reloading {}".format(name))
+        try:
+            reimport.reimport('aide_core.apis.{}'.format(name))
+        except ValueError:
+            apis._update()
+            reimport.reimport('aide_core.apis.{}'.format(name))
 
     def load_routines(self):
         loginfo("Loading routines...")
@@ -258,20 +276,21 @@ class EventHandler(object):
             self.routines.append(Routine(event_notifier=self.event_notifier, **routine))
         loginfo("...done!")
 
-    def load_events(self):
+    def load_event_listeners(self):
         loginfo("Loading events...")
-        loaded_events = self.event_storage.find(select_only=get_slots(Event))
-        for event in loaded_events:
-            loginfo("Loading event {}".format(event))
-            register_event(Event(**event))
+        loaded_events = self.event_listeners_storage.find(select_only=get_slots(EventListener))
+        for event_listener in loaded_events:
+            loginfo("Loading event {}".format(event_listener))
+            register_event_listener(EventListener(**event_listener))
 
-    def get_event(self, name):
+    def get_event_listener(self, name):
         loginfo("Getting event {}".format(name))
-        result = self.event_storage.find_one(where={"name": name}, select_only=get_slots(aide_messages.msg.Event))
+        result = self.event_listeners_storage.find_one(where={"name": name},
+                                                       select_only=get_slots(aide_messages.msg.EventListener))
         return result or {}
 
-    def get_all_events(self):
-        return self.event_storage.find({})
+    def get_all_event_listeners(self):
+        return self.event_listeners_storage.find({})
 
     def get_routine(self, name):
         return self.routine_storage.find_one(where={"name": name}, select_only=get_slots(aide_messages.msg.Routine))
@@ -292,31 +311,63 @@ class EventHandler(object):
     def get_all_routines(self):
         return self.routine_storage.find({})
 
-    def add_rule(self, routine, events):
+    def add_rule(self, routine, event_listeners):
         """
 
         :type routine: aide_messages.msg.Routine
         """
-        self.add_routine(routine)
-        for event in events:
-            self.add_event(event)
+
+        if not routine.name:
+            return False, "Routine needs a name!"
+        faulty_event_listener = None
+        for event_listener in event_listeners:
+            if not faulty_event_listener:
+                success = self.add_event_listener(event_listener)
+                if not success:
+                    loginfo("Got error trying to register events. undoing changes.")
+                    faulty_event_listener = event_listener
+
+        if faulty_event_listener:
+            for event_listener in event_listeners:
+                self.remove_event_listener(event_listener.name)
+            return False, "Event listener {} has an illegal definition.. Does it have a name? Is the SPARQL Clause valid?".format(
+                faulty_event_listener.name)
+        else:
+            self.add_routine(routine)
+            return True, None
+
+    def remove_event_listener(self, name):
+        self.event_listeners_storage.delete_one(where={"name": name})
+        try:
+            unregister_event_listener(name)
+        except:
+            loginfo("Got error unregistering event.")
+            return False
+
         return True
 
-    def add_event(self, event):
+    def add_event_listener(self, event):
         """
 
-        :type event: aide_messages.msg.Event
+        :type event: aide_messages.msg.EventListener
         """
-        if not event.sparqlWhere.startswith("{") and event.sparqlWhere.endswith("}"):
-            # if not enclosed in braces, do so
-            event.sparqlWhere = "{{{}}}".format(event.sparqlWhere)
-        result = self.event_storage.find_one(where={"name": event.name})
+
+        # add where and enclose in braces
+        event.sparqlWhere = "WHERE {{ {} }}".format(event.sparqlWhere)
+        result = self.event_listeners_storage.find_one(where={"name": event.name})
         if result:
             loginfo("Event with this name already exists...")
-            self.event_storage.replace_one(replace_with=event, where={"name": event.name})
+            self.event_listeners_storage.replace_one(replace_with=event, where={"name": event.name})
         else:
-            self.event_storage.insert(entry=event)
-        register_event(event)
+            self.event_listeners_storage.insert(entry=event)
+
+        try:
+            register_event_listener(event)
+        except:
+            loginfo("Got error registering event.")
+            return False
+
+        return True
 
     def add_routine(self, routine):
         """
@@ -357,17 +408,18 @@ if __name__ == '__main__':
 
     loginfo("Creating event handler...")
     event_handler = EventHandler()
-    # rospy.Subscriber("/aide/update_apis", Bool, lambda x: _reload_api_references() if x.data else ())
     rospy.Subscriber("/aide/events", FiredEvent, event_handler.handle_incoming)
+
+    rospy.Subscriber("/aide/update_apis", String, lambda x: event_handler.reload_api_references(x.data))
 
     loginfo("Registering services...")
     get_service_handler(AddRule).register_service(event_handler.add_rule)
     get_service_handler(GetAllRoutines).register_service(event_handler.get_all_routines)
     get_service_handler(GetRoutine).register_service(lambda name: event_handler.get_routine(name))
-    get_service_handler(GetEvent).register_service(lambda name: event_handler.get_event(name) or ())
+    get_service_handler(GetEventListener).register_service(lambda name: event_handler.get_event_listener(name) or ())
     get_service_handler(DeleteRoutine).register_service(event_handler.delete_routine)
 
-    get_service_handler(GetAllEvents).register_service(event_handler.get_all_events)
+    get_service_handler(GetAllEventListeners).register_service(event_handler.get_all_event_listeners)
     loginfo("Registered services. Spinning.")
 
     rospy.spin()
