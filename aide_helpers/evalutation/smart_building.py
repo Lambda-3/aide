@@ -20,6 +20,7 @@ class SmartBuildingSimulator(object):
         self.on_fire = False
         self.persons = 10
         self.fire_department_arrived = False
+        self.ended = False
 
     def set_on_fire(self, room):
         loginfo("Fire detected in room {}!".format(room))
@@ -47,6 +48,7 @@ class SmartBuildingSimulator(object):
             rate.sleep()
         loginfo("Fire department has arrived!")
         rate.sleep()
+        self.on_fire = False
         loginfo("Simulation ended.")
 
     def get_state(self):
@@ -93,13 +95,13 @@ def publish(building):
     pub = rospy.Publisher("/aide/building", String, queue_size=42)
     rate = rospy.Rate(3)
 
-    while not rospy.is_shutdown():
+    while not rospy.is_shutdown() and not building.ended:
         pub.publish(json.dumps(building.get_state()))
         rate.sleep()
 
 
 def main():
-    rospy.init_node("evaluation_ac")
+    rospy.init_node("evaluation_building")
     building = SmartBuildingSimulator()
     rospy.Subscriber("/aide/building_control", String, callback=lambda msg: building.handle_incoming(msg.data))
 

@@ -1,9 +1,11 @@
 import subprocess
 import os
 
+
 try:
+    use_espeak = True
     from sound_play.libsoundplay import SoundClient
-    _sound_play = True
+    _sound_play = not use_espeak
 except ImportError:
     _sound_play = False
 

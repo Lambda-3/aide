@@ -3,7 +3,7 @@ import pymongo
 
 client = pymongo.MongoClient()
 
-evts = client.db['events']
+evts = client.db['event_listeners']
 evts.delete_many({})
 
 routines = client.db['routines']

@@ -1,9 +1,7 @@
-import subprocess
-
 import requests
-import json
 
 from aide_core import credentials
+import location
 
 API_KEY = credentials.OPEN_WEATHER_MAP_API_KEY
 ENDPOINT = "http://api.openweathermap.org/data/2.5/weather?&units=metric&appid={}".format(API_KEY)
@@ -36,7 +34,9 @@ def get_weather(latitude, longitude):
     }
 
 
-
+def get_weather_at_my_place_human_readable():
+    return get_weather_at_my_place_human_readable(**location.get_location())
+    
 
 def get_weather_human_readable(lat, lng):
     weather= get_weather(lat, lng)

@@ -10,6 +10,17 @@ ENDPOINT = "https://www.googleapis.com/geolocation/v1/geolocate?key={}".format(A
 
 
 def get_location():
+    """
+    Queries the google API for the current location of the PC this system is running on.
+    
+    Location results are dicts of coordinates in the following form:
+    {
+        "lat": latitude,
+        "lng": longitude
+    }
+    :rtype: dict
+    """
+    
     # get all wifis using nmcli.
     mac_adresses = subprocess.check_output(
         ["nmcli", "-t", "-m", "multiline", "-f", "BSSID,CHAN,SIGNAL", "dev", "wifi", "list"]

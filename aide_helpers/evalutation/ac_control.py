@@ -42,8 +42,10 @@ class ACControllerSimulator(object):
             rate.sleep()
             loginfo(self.temperature)
 
-        while self.temperature < 22.5 and not self.finished:
+        while  self.temperature < 22.5 and not self.finished:
             self.temperature += 0.1
+            rate.sleep()
+            loginfo(self.temperature)
 
         loginfo("Simulation ended.")
 
