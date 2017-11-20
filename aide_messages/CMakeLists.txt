@@ -47,7 +47,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   AirConditionerMessage.msg
-  Event.msg
+  EventListener.msg
   FiredEvent.msg
   Function.msg
   Person.msg
@@ -65,7 +65,7 @@ add_service_files(
   FILES
   AddActionProvider.srv
   AddApi.srv
-  AddEvent.srv
+  AddEventListener.srv
   AddExtractor.srv
   AddFunction.srv
   AddRule.srv
@@ -78,16 +78,17 @@ add_service_files(
   GetActionProvider.srv
   GetAllActionProviders.srv
   GetAllApis.srv
-  GetAllEvents.srv
+  GetAllEventListeners.srv
   GetAllExtractors.srv
   GetAllFunctions.srv
   GetAllRoutines.srv
   GetApi.srv
-  GetEvent.srv
+  GetEventListener.srv
   GetExtractor.srv
   GetFunction.srv
   GetRoutine.srv
   GetSemRelatedFunctions.srv
+  RemoveEventListener.srv
   ResetTrackFace.srv
   TrackFace.srv
   TrackSkeleton.srv
