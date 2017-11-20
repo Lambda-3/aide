@@ -1,2 +1,3 @@
 *.pyc
 /aide_core/ObservedDataGraph.rdf
+.rdf
