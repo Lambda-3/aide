@@ -1,3 +1,8 @@
+"""
+System API. Don't change if you don't know what you're doing.
+"""
+
+
 import aide_messages.srv as services
 import pymongo
 import rospy
@@ -139,10 +144,7 @@ class ServiceHandler:
                 else:
                     raise ValueError("{} is neither a dict nor a Ros Message!".format(result_in_slot))
             loginfo("Returning: {} of type {}".format(response, type(response)))
-            try:
-                print(type(response['routines'][0].name))
-            except:
-                pass
+
             return response
 
         return rospy.Service(self.SERVICE_CHANNEL, self.service_class, improved_callback)

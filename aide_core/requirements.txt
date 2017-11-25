@@ -3,3 +3,6 @@ yapf
 pylint
 pymongo
 rdflib
+reimport
+SpeechRecognition
+flask_cors

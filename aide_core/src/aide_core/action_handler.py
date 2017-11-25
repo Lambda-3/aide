@@ -12,7 +12,7 @@ from aide_messages.srv import (CallFunction, AddActionProvider, GetAllActionProv
 from aide_messages.srv._DeleteActionProvider import DeleteActionProvider
 from rospy import loginfo
 from rospy.core import logerror
-from std_msgs.msg import Bool, String
+from std_msgs.msg import String
 
 import actions
 import apis.storage
@@ -51,9 +51,6 @@ class ActionHandler:
                 raise IOError(e)
 
     def reload_api_references(self, name):
-        # for module in reimport.modified(config.APIS_PATH):
-        #     if not module == "__main__":
-        #         loginfo("Module {} changed. reloading...".format(module))
         loginfo("Reloading {}".format(name))
         try:
             reimport.reimport('aide_core.apis.{}'.format(name))

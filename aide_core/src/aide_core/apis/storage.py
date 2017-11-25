@@ -1,3 +1,8 @@
+"""
+System API. Don't change if you don't know what you're doing.
+"""
+
+
 import inspect
 from functools import partial
 
@@ -33,6 +38,14 @@ class CollectionWrapper(object):
 
 
 def get_collection(name=None, indices=list()):
+    """
+    Top level function. Call this to get a collection wrapper object to call all the functions implemented there.
+
+    :param name: Name of the collection.
+    :param indices: What to use as indices.
+    :return: CollectionWrapper object
+    :rtype: CollectionWrapper
+    """
     name = _cure_args(name)
     collection = __client.db[name]
     for index in indices:

@@ -1,3 +1,8 @@
+"""
+System API. Don't change if you don't know what you're doing.
+"""
+
+
 import re
 
 from pylint import lint

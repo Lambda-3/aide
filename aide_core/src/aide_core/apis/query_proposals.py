@@ -5,7 +5,6 @@ import rdflib
 import rospy
 from aide_messages.msg import RdfGraphStamped
 from rdflib import RDF, RDFS
-from rospy import loginfo
 from rospy.core import logerror, logdebug
 
 from aide_core.apis.util import to_space
@@ -17,6 +16,10 @@ from aide_core.apis import indra
 
 
 class QueryProposal(object):
+    """
+    Class containing information about query proposals and providing different representation methods, depending on
+    what they are used for.
+    """
     def __init__(self, cls, property, range, single=False, entity=None):
         self.cls = cls
         self.explicit_class = not "genClass" in cls.toPython()
@@ -29,6 +32,11 @@ class QueryProposal(object):
         self.range = range
 
     def format_for_indra(self, include_extractor=True):
+        """
+        Formats the query proposal for ranking with indra.
+        :param include_extractor: Whether to include the source of the triple proposed.
+        :return: String representation.
+        """
         formatted_cls = self.cls.rsplit("/", 1)[-1]
         if not self.explicit_class:
             formatted_cls = formatted_cls.split("genClass")[-1].strip()
@@ -38,19 +46,27 @@ class QueryProposal(object):
         formatted_prop = self.property.rsplit("/", 1)[-1].strip()
 
         return to_space("{0} {1}".format(formatted_cls, formatted_prop))
-
-    def __repr__(self):
-        return repr(self.format_for_sparql())
-
-    def format_for_sparql(self):
-        result = []
-        lit_name = "?{}".format(self.range.rsplit("XMLSchema#")[1])
-        if self.explicit_class:
-            result.append("?s a {}".format(self.cls))
-        result.append("?s {prop} {lit}".format(prop=self.property, lit=lit_name))
-        return result
+    #
+    # def __repr__(self):
+    #     return repr(self.format_for_sparql())
+    #
+    # def format_for_sparql(self):
+    #     """
+    #     Formats the query proposal as sparql.
+    #     :return: String representation as sparql where clause part.
+    #     """
+    #     result = []
+    #     lit_name = "?{}".format(self.range.rsplit("XMLSchema#")[1])
+    #     if self.explicit_class:
+    #         result.append("?s a {}".format(self.cls))
+    #     result.append("?s {prop} {lit}".format(prop=self.property, lit=lit_name))
+    #     return result
 
     def get_sparql(self):
+        """
+        Formats the query proposal as part of a sparql where clause.
+        :return: String representation as sparql where clause part.
+        """
         result = []
         subj_name = "?s" if not self.single else self.entity
         try:

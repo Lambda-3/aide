@@ -1,3 +1,7 @@
+"""
+Some example API.
+"""
+
 def fancify_string(string):
     """
     

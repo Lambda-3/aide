@@ -3,13 +3,11 @@ import atexit
 import json
 from code import InteractiveConsole as Console
 
-from rospy import Rate
 import roslib
 import rospy
 from rospy import loginfo
 from threading import Thread
-from std_msgs.msg import Bool, String
-from aide_messages.msg import AirConditionerMessage
+from std_msgs.msg import  String
 
 roslib.load_manifest("aide_helpers")
 

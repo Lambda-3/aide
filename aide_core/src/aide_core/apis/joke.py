@@ -4,6 +4,11 @@ ENDPOINT = "https://api.icndb.com/jokes/random/?firstName=My&lastName=Robot&limi
 
 
 def get_random_joke():
+    """
+    Gets a random joke from the api specified by ENDPOINT.
+    :return: A random joke.
+    :rtype: str
+    """
     headers = {
         'content-type': "application/json"
     }

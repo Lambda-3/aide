@@ -13,7 +13,6 @@ from aide_messages.srv import (CallFunction, AddEventListener, RemoveEventListen
 from aide_messages.srv._DeleteRoutine import DeleteRoutine
 from rospy import loginfo
 from rospy.core import logwarn
-from rosservice import ROSServiceException
 from std_msgs.msg import String
 
 import apis
@@ -61,7 +60,6 @@ class Execute(Step):
     def __init__(self, function, mapping=None, literals=None, funcs=None):
         self.what = function
         self.mapping = mapping or dict()
-        # self.parametrized = True if mapping else False
         self.literals = literals or dict()
         self.funcs = funcs or dict()
 
@@ -134,7 +132,7 @@ class Routine(object):
             loginfo("Event {} triggered routine {}".format(event.name, self.name))
             self.params = event.params
             threading.Thread(target=self.trigger).start()
-            # self.trigger()
+
 
     def trigger(self):
         loginfo("Routine {} triggered.".format(self.name))
@@ -256,9 +254,6 @@ class EventHandler(object):
         storage.get_collection(name="events", indices=["name"])
 
     def reload_api_references(self, name):
-        # for module in reimport.modified(config.APIS_PATH):
-        #     if not module == "__main__":
-        #         loginfo("Module {} changed. reloading...".format(module))
         loginfo("Reloading {}".format(name))
         try:
             reimport.reimport('aide_core.apis.{}'.format(name))

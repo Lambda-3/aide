@@ -15,10 +15,7 @@ class PositionExtractor(AbstractPeriodicExtractor):
         self.listener = TransformListener()
 
     def extract(self):
-        """
-        Hurr durr.
-        
-        """
+
         try:
             ((x, y, _), _) = self.listener.lookupTransform(self.MAP_LINK, self.ROBOT_LINK, rospy.Time(0))
         except:

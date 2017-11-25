@@ -1,7 +1,5 @@
 import random
 
-import reimport
-from rospy import loginfo
 
 from aide_core.extractors import AbstractPeriodicExtractor
 from aide_core.namespaces import robot

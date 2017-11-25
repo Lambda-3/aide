@@ -28,7 +28,6 @@ excluded = ["speech_extractor.py", "position_extractor.py", "dummy_extractor.py"
 
 class ExtractorHandler(object):
     def __init__(self):
-        self.load_all_extractors()
         self.extractors = dict()
         extractor_files = self.get_all_extractor_files()
 
@@ -38,17 +37,8 @@ class ExtractorHandler(object):
                 file_content = f.read()
             self.add_extractor(f.name.rsplit("/", 1)[-1], file_content, loading=True)
 
-    def load_all_extractors(self):
-        pass
 
     def reload_api_references(self, name):
-        # modified_modules = reimport.modified(config.APIS_PATH)
-        # loginfo("Modules {} changed. reloading...".format(modified_modules))
-        # if modified_modules:
-        #     for module in modified_modules:
-        #         if not module == "__main__" and not module == "__mp_main__":
-        #             loginfo("Module {} changed. reloading...".format(module))
-        #             reimport.reimport(module)
         loginfo("Reloading {}".format(name))
         try:
             reimport.reimport('aide_core.apis.{}'.format(name))
@@ -73,7 +63,6 @@ class ExtractorHandler(object):
 
         :type ExtractorClass: AbstractExtractor
         """
-        # name = ExtractorClass.__name__
         name = ExtractorClass.__name__
         extractor = self.extractors.pop(name, None)
         if extractor:
@@ -82,7 +71,6 @@ class ExtractorHandler(object):
         publisher = rospy.Publisher("/aide/rdf", RdfGraphStamped, queue_size=ExtractorClass.queue_size)
         extractor = ExtractorClass(publisher=publisher)
 
-        # subscriber = rospy.Subscriber(extractor.from_channel, extractor.type, callback)
 
         self.extractors[name] = extractor
         loginfo(self.extractors)
@@ -119,7 +107,6 @@ class ExtractorHandler(object):
 
         loginfo("   Importing...")
         try:
-            # exec ("""import extractors.{0} as {0}""".format(extractor_name))
             extractor_module = importlib.import_module("aide_core.extractors.{}".format(extractor_name))
             loginfo(extractor_module)
             imp.reload(extractor_module)
@@ -163,8 +150,6 @@ class ExtractorHandler(object):
 
 if __name__ == '__main__':
     rospy.init_node("extractor")
-
-    # publisher = rospy.Publisher("/aide/test_node", String, queue_size=50)
 
     loginfo("Creating extractor handler...")
     extractor_handler = ExtractorHandler()

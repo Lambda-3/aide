@@ -1,3 +1,7 @@
+"""
+Example API to tag places on the map.
+"""
+
 import atexit
 from rospy import loginfo
 from aide_core.apis import storage
