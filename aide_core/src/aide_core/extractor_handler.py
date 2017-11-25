@@ -88,7 +88,13 @@ class ExtractorHandler(object):
         loginfo(self.extractors)
 
     def add_extractor(self, name, file_content, loading=False):
-        class_name = re.findall("class\s+(.*?)[\(,:]", file_content)[0]
+        if not name:
+            return False, "File name must not be empty!"
+        try:
+            class_name = re.findall("class\s+(.*?)[\(,:]", file_content)[0]
+        except IndexError:
+            return False, "No class found!"
+
         loginfo("Class name: {}".format(class_name))
         if name.endswith(".py"):
             name = name[:-3]

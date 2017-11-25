@@ -33,6 +33,7 @@ def activate_sprinkler(room):
     """
     __pub.publish(String("Sprinklers activated in room {}".format(room)))
 
+
 def switch_lighting_mode(mode):
     """
     Switches the lighting mode of the building to a given mode.
@@ -48,9 +49,15 @@ def switch_lighting_mode(mode):
 
     Defaults to normal.
     """
-    mode = mode if mode in ("night", "emercency", "off") else "normal"
+    mode = mode if mode in ("night", "emergency", "off") else "normal"
     __pub.publish("Switched lighting mode to: {}".format(mode))
 
 
 def broadcast_message(message):
+    """
+    Broadcasts a message in the whole building.
+    :param message: Message to broadcast.
+    :type message: str
+    """
+
     __pub.publish(String("Broadcasting message: {}".format(message)))

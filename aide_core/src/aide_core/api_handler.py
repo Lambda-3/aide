@@ -49,6 +49,9 @@ class ApiHandler:
     def add_api(self, name, file_content, loading=False):
         loginfo("Adding api %s" % name)
 
+        if not name:
+            return False, "Name must not be empty!"
+
         if name.endswith(".py"):
             name = name[:-3]
         file_name = name + ".py"
@@ -83,7 +86,7 @@ class ApiHandler:
         api_funcs = [
             {
                 "name": f[0],
-                "doc": util.get_doc(imported_api),
+                "doc": util.get_doc(f[1]),
                 "api": name,
                 "args": inspect.getargspec(f[1]).args,
                 "hinted_args": util.get_type_hints(f[1])[0]

@@ -16,8 +16,11 @@ def Graph(*args):
         triples_list = [triple for tpl in args for triple in tpl.to_rdf_triples()]
         loginfo(type(triples_list[0]))
         return RdfGraphStamped(triples_list)
+    else:
+        loginfo("not a list of subjects!")
     try:
         return RdfGraphStamped(args)
+
     except TypeError as e:
         logerror(str(e))
 

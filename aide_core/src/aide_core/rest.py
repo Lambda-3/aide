@@ -3,17 +3,17 @@ import threading
 
 import roslib
 import rospy
-from aide_messages.msg import Routine, Event
+from aide_messages.msg import Routine, EventListener
 from aide_messages.srv import (AddRule, GetApi, GetAllApis, GetActionProvider, GetAllActionProviders,
                                AddActionProvider, AddExtractor, GetAllExtractors, GetExtractor, GetAllRoutines,
-                               GetEvent, GetAllEvents, AddApi, GetRoutine, DeleteApi, DeleteExtractor,
+                               GetEventListener, GetAllEventListeners, AddApi, GetRoutine, DeleteApi, DeleteExtractor,
                                DeleteActionProvider)
 from aide_messages.srv._DeleteRoutine import DeleteRoutine
 from enum import Enum
 from flask import Flask
 from flask_cors import CORS
 from flask_restful import Api, reqparse, Resource, abort, marshal
-from rospy import loginfo, logdebug, logwarn
+from rospy import loginfo, logdebug
 
 from aide_core.apis import query_proposals
 from apis import approximate
@@ -61,16 +61,13 @@ def parse_sparql_autocomplete():
 
 
 def parse_rule():
-    # TODO
-    # subject of change, will be replaced by a generalized function
-    # that validates json input against a ros message
     def parse_routine(routine):
         return to_ros_message(Routine._type, routine)
 
-    def parse_events(events):
+    def parse_event_listeners(events):
         parsed_events = []
         for event in events:
-            parsed_events.append(to_ros_message(Event._type, event))
+            parsed_events.append(to_ros_message(EventListener._type, event))
         return parsed_events
 
     parser = reqparse.RequestParser()
@@ -78,7 +75,7 @@ def parse_rule():
                         type=parse_routine,
                         help="Need a routine!",
                         location="json")
-    parser.add_argument('events', required=False, type=parse_events, default=[], location="json")
+    parser.add_argument('event_listeners', required=False, type=parse_event_listeners, default=[], location="json")
     return parser.parse_args()
 
 
@@ -127,12 +124,12 @@ class ResourceEnum(Enum):
     }
 
     Event = {
-        "get": get_service_handler(GetEvent).call_service,
+        "get": get_service_handler(GetEventListener).call_service,
         "path": "/aide/events/<string:name>"
     }
 
     Events = {
-        "get": get_service_handler(GetAllEvents).call_service
+        "get": get_service_handler(GetAllEventListeners).call_service
     }
 
     Format = {

@@ -62,6 +62,9 @@ class ActionHandler:
             reimport.reimport('aide_core.apis.{}'.format(name))
 
     def add_action_provider(self, name, file_content, loading=False):
+        if not name:
+            return False, "Name must not be empty!"
+
         loginfo("Adding action provider %s" % name)
         if name.endswith(".py"):
             name = name[:-3]

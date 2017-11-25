@@ -1,7 +1,4 @@
-import subprocess
-
 import requests
-import json
 
 from aide_core import credentials
 from aide_core.apis import location

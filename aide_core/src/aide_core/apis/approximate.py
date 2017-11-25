@@ -1,6 +1,6 @@
 import inspect
 
-from aide_messages.msg import Event
+from aide_messages.msg import EventListener
 from aide_core.apis import storage
 from enum import Enum
 from rospy import loginfo
@@ -9,7 +9,7 @@ from aide_core.apis import ros_services
 from aide_core.apis.util import camel_case_to_underscore, underscore_to_camel_case
 
 
-def create(**params):
+def _create(**params):
     try:
         params['collection']
     except KeyError:
@@ -34,19 +34,19 @@ def create(**params):
 
 
 class Types(Enum):
-    Apis = create()
+    Apis = _create()
 
-    ApiFuncs = create(select_only=["api", "doc", "name", "args", "hinted_args"], word_format="{api} {name}")
+    ApiFuncs = _create(select_only=["api", "doc", "name", "args", "hinted_args"], word_format="{api} {name}")
 
-    Actions = create()
+    Actions = _create()
 
-    ActionFuncs = create(select_only=["api", "doc", "name", "args", "hinted_args"], word_format="{api} {name}")
+    ActionFuncs = _create(select_only=["api", "doc", "name", "args", "hinted_args"], word_format="{api} {name}")
 
-    Events = create(select_only=ros_services.get_slots(Event))
+    Events = _create(collection="event_listeners", select_only=ros_services.get_slots(EventListener))
 
-    Routines = create()
+    Routines = _create()
     
-    Something = create()
+    Something = _create()
 
 
 def get_semantically_related(to, type, top_k=3):

@@ -39,7 +39,10 @@ class AbstractExtractor(object):
 
     def publish(self, message):
         if message:
-            graph = Graph(*message)
+            if type(message) == list or type(message) == tuple:
+                graph = Graph(*message)
+            else:
+                graph = Graph(message)
             if graph:
                 try:
                     self.publisher.publish(graph)
@@ -55,21 +58,8 @@ class AbstractExtractor(object):
                 result = self.loop()
                 self.publish(result)
             except Exception as e:
-                logwarn("ERROR")
-                rospy.Rate(1).sleep()
-                # if self.to_reimport:
-                # self.reimport()
-                # self.reimport()
-                # self.to_reimport = []
+                logwarn("ERROR: {}".format(type(e)))
 
-    # def set_reimport(self, modules):
-    #     self.to_reimport = modules
-    #
-    # def reimport(self):
-    #     loginfo("REIMPORTING {}".format(self.__class__.__name__))
-    #     loginfo(reimport.modified())
-    #     reimport.reimport('aide_core.apis.simple')
-    #     loginfo(aide_core.apis.simple.fancify_string("asdf"))
 
     @abstractmethod
     def loop(self):
@@ -101,7 +91,9 @@ class AbstractPeriodicExtractor(AbstractExtractor):
         pass
 
     def loop(self):
+        loginfo("getting result")
         result = self.extract()
+        loginfo("got result")
         rospy.Rate(self.rate).sleep()
         return result
         # rospy.sleep(self.rate)
