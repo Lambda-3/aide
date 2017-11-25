@@ -1,7 +1,7 @@
 import inspect
 
 from aide_messages.msg import Event
-from apis import storage
+from aide_core.apis import storage
 from enum import Enum
 from rospy import loginfo
 

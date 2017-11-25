@@ -25,7 +25,7 @@ class SpeechExtractor(AbstractExtractor):
             if text:
                 subj = speech._
                 subj.speechContent = text
-                self.publish(subj)
+                return subj
 
     def process_audio(self, audio):
         """

@@ -4,7 +4,7 @@ import requests
 import json
 
 from aide_core import credentials
-
+from aide_core.apis import location
 API_KEY = credentials.OPEN_WEATHER_MAP_API_KEY
 ENDPOINT = "http://api.openweathermap.org/data/2.5/weather?&units=metric&appid={}".format(API_KEY)
 
@@ -36,6 +36,15 @@ def get_weather(latitude, longitude):
     }
 
 
+def get_weather_at_my_place_human_readable():
+    """
+    Returns the weather at the location of the robot in a human readable format.
+
+    :return: weather at bots location readable by humans.
+    :rtype: str
+    """
+    weather = get_weather(**location.get_location())
+    get_weather_human_readable(**weather)
 
 
 def get_weather_human_readable(lat, lng):

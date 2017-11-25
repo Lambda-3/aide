@@ -6,7 +6,7 @@ import rospy
 from aide_messages.msg import RdfGraphStamped
 from rdflib import RDF, RDFS
 from rospy import loginfo
-from rospy.core import logerror
+from rospy.core import logerror, logdebug
 
 from aide_core.apis.util import to_space
 from aide_core.apis.rdf_utils import properties, string_to_literal
@@ -54,9 +54,9 @@ class QueryProposal(object):
         result = []
         subj_name = "?s" if not self.single else self.entity
         try:
-            lit_name = "?{}{}".format(self.property.rsplit("/",1)[1], self.range.rsplit("XMLSchema#")[1].capitalize())
+            lit_name = "?{}{}".format(self.property.rsplit("/", 1)[1], self.range.rsplit("XMLSchema#")[1].capitalize())
         except IndexError:
-            lit_name = "?{}".format(self.property.rsplit("/",1)[-1])
+            lit_name = "?{}".format(self.property.rsplit("/", 1)[-1])
         if self.explicit_class:
             result.append({
                 "subject": subj_name,
@@ -131,63 +131,61 @@ class QueryProposalManager(object):
         }
     }"""
 
-    single_instance_query = """"""
-
     def __init__(self):
         self.graph = rdflib.ConjunctiveGraph()
         # TODO
         self.graph.parse("/home/viktor/workspace/catkin_ws/src/aide/aide_core/Namespaces.rdf", format="turtle")
         ns = dict(self.graph.namespaces())
-        print self.graph.serialize(format="n3")
         self.property_path = prepareQuery(self.property_path, initNs=ns)
         self.subject_and_class_query = prepareQuery(self.subject_and_class_query, initNs=ns)
         self.domains_query = prepareQuery(self.domains_query, initNs=ns)
         self.from_entity = prepareQuery(self.from_entity, initNs=ns)
         self.single_query = prepareQuery(self.single_query, initNs=ns)
         rospy.Subscriber("/aide/rdf", RdfGraphStamped, self.extend_onthology)
-        # TODO: for the time being
-        # self.graph.parse(config.PROJECT_PATH + "/ObservedDataGraph.rdf", format="turtle")
 
     def extend_onthology(self, incoming_graph):
         """
+        Extends the ontology maintained by this graph.
+
+        This function is called on every incoming message, which is a graph. It checks whether some new onthology
+        information can be deduced from the incoming graph.
 
         :type incoming_graph: RdfGraphStamped
         """
+        # this is properties that have not literals as ranges
         pending_ranges = []
         subjects_with_classes = dict()
         grouped_by_subject = (grouped for grouped in groupby(incoming_graph.quadruples, lambda x: x.subject))
         for subject, triples in grouped_by_subject:
+
             subject = URIRef(subject)
-            # triples = [triple for triple in triples]
-            # loginfo("subject: {} TRIPLES: {}".format(subject, [triple for triple in triples]))
-            # classes = [triple.object for triple in triples if triple.predicate == RDF.type.toPython()]
-            # loginfo("classes: {}".format(classes))
-            # predicates = [(triple.predicate, triple.object) for triple in triples if triple.predicate !=
-            #               RDF.type.toPython()]
             classes, predicates = [], []
+
             for triple in triples:
                 predicate = URIRef(triple.predicate)
                 if predicate == RDF.type:
+                    # class of the subject
                     classes.append(URIRef(triple.object))
                 else:
                     predicates.append((predicate, string_to_literal(triple.object)))
-            # loginfo("predicates: {}".format(predicates))
 
             subjects_with_classes[subject] = classes
             if not "uuid-" in subject:
-                # if 'uuid' in subject URI, then its a candidate for single
                 for cls in classes:
-                    loginfo("class: {}".format(cls))
-                    loginfo("subject: {}".format(subject))
+                    logdebug("class: {}".format(cls))
+                    logdebug("subject: {}".format(subject))
+                    # check if single instance
                     result = self.graph.query(self.single_query, initBindings={"class": cls, "subject":
                         subject}).askAnswer
-                    loginfo("Is single?: {}".format(result))
+                    logdebug("Is single?: {}".format(result))
+                    # if single, save property single for class
                     if result:
                         self.graph.addN([
                             (cls, properties.single, Literal(True), self.graph),
                             (cls, properties.instance, subject, self.graph)
                         ])
                     else:
+                        # else save property single false
                         self.graph.set((cls, properties.single, Literal(False)))
             props = []
             for predicate, object in predicates:
@@ -213,9 +211,13 @@ class QueryProposalManager(object):
             if classes:
                 pending_props.extend((URIRef(predicate), RDFS.range, cls, self.graph) for cls in classes)
         self.graph.addN(pending_props)
-        print self.graph.serialize(format="n3")
 
     def get_query_proposals_from_plaintext(self, plain_text, subj_classes=None, entity=None, top_k=5):
+        """
+        Gets the proposals based on their relatedness to a given plaintext.
+
+        For parameter description take a look the documentation of the top-level function.
+        """
         if (isinstance(subj_classes, str)):
             subj_classes = [subj_classes]
         if subj_classes:
@@ -251,18 +253,22 @@ def get_query_proposal(text, classes=None, entity=None, top_k=5):
     """
     Top level interface function.
 
-    Gets `top_k` SPARQL statements sorted by their semantic relatedness to `string`. The statements are derived from:
+    Gets `top_k` SPARQL statements sorted by their semantic relatedness to a given plaintext. The statements are
+    derived
+    from:
 
     - data observed on the rdf channel.
 
-    - TODO: explicit ontology definitions in the extractors
-
-    - TODO: implicit onthology derived from code analysis
-
-    :param string:
-    :type string: str
-    :return:
-    :rtype: str
+    :param text: Plain text to compare the results to.
+    :type text: str
+    :param classes: Classes which the properties must have as their domains. Defaults to None.
+    :type classes: list
+    :param entity: If given, query proposals are only generated for this entity.
+    :type entity: str
+    :return: Returns `top_k` query proposals ranked by their relatedness to given plaintext.
+    :param top_k: Number of proposals to return.
+    :type top_k: int
+    :rtype: list
     """
     if not _qp:
         __init()
@@ -270,6 +276,12 @@ def get_query_proposal(text, classes=None, entity=None, top_k=5):
 
 
 def get_domains_of_property(property):
+    """
+    Gets the domain classes of a given property.
+
+    :param property: Property to get the domains for.
+    :return: domain classes of given property.
+    """
     if not _qp:
         __init()
     return _qp.get_domains_of_property(property)

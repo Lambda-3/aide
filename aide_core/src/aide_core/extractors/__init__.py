@@ -52,7 +52,8 @@ class AbstractExtractor(object):
         loginfo(self.finished)
         while not self.finished:
             try:
-                self.loop()
+                result = self.loop()
+                self.publish(result)
             except Exception as e:
                 logwarn("ERROR")
                 rospy.Rate(1).sleep()
@@ -101,10 +102,8 @@ class AbstractPeriodicExtractor(AbstractExtractor):
 
     def loop(self):
         result = self.extract()
-        loginfo("got result")
-        self.publish(result)
-        loginfo("result published")
         rospy.Rate(self.rate).sleep()
+        return result
         # rospy.sleep(self.rate)
 
 
