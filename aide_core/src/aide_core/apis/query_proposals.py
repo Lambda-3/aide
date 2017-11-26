@@ -7,6 +7,7 @@ from aide_messages.msg import RdfGraphStamped
 from rdflib import RDF, RDFS
 from rospy.core import logerror, logdebug
 
+from aide_core import config
 from aide_core.apis.util import to_space
 from aide_core.apis.rdf_utils import properties, string_to_literal
 from rdflib.plugins.sparql.processor import prepareQuery
@@ -149,8 +150,7 @@ class QueryProposalManager(object):
 
     def __init__(self):
         self.graph = rdflib.ConjunctiveGraph()
-        # TODO
-        self.graph.parse("/home/viktor/workspace/catkin_ws/src/aide/aide_core/Namespaces.rdf", format="turtle")
+        self.graph.parse(config.NAMESPACES_PATH, format=config.NAMESPACES_FORMAT)
         ns = dict(self.graph.namespaces())
         self.property_path = prepareQuery(self.property_path, initNs=ns)
         self.subject_and_class_query = prepareQuery(self.subject_and_class_query, initNs=ns)
