@@ -3,6 +3,7 @@ import threading
 
 import roslib
 import rospy
+import json
 from aide_messages.msg import Routine, EventListener
 from aide_messages.srv import (AddRule, GetApi, GetAllApis, GetActionProvider, GetAllActionProviders,
                                AddActionProvider, AddExtractor, GetAllExtractors, GetExtractor, GetAllRoutines,
@@ -10,7 +11,7 @@ from aide_messages.srv import (AddRule, GetApi, GetAllApis, GetActionProvider, G
                                DeleteActionProvider)
 from aide_messages.srv._DeleteRoutine import DeleteRoutine
 from enum import Enum
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from flask_restful import Api, reqparse, Resource, abort, marshal
 from rospy import loginfo, logdebug
@@ -65,18 +66,33 @@ def parse_rule():
         return to_ros_message(Routine._type, routine)
 
     def parse_event_listeners(events):
-        parsed_events = []
-        for event in events:
-            parsed_events.append(to_ros_message(EventListener._type, event))
-        return parsed_events
+		parsed_events = []
+	
+		loginfo(events)
+		for event in events:
+		    loginfo(type(event))
+		    loginfo(event)
+		    parsed_events.append(to_ros_message(EventListener._type, event))
+		return parsed_events
 
-    parser = reqparse.RequestParser()
-    parser.add_argument('routine', required=True,
-                        type=parse_routine,
-                        help="Need a routine!",
-                        location="json")
-    parser.add_argument('event_listeners', required=False, type=parse_event_listeners, default=[], location="json")
-    return parser.parse_args()
+    data = json.loads(request.data)
+    routine = data['routine']
+    listeners = data['event_listeners']
+    try:
+	    parsed_routine = parse_routine(routine)
+	    parsed_event_listeners = parse_event_listeners(listeners)
+    except:
+	raise ValueError("Wrong input data")
+    return {"routine": parsed_routine, "event_listeners": parsed_event_listeners} 
+    
+    # ok this is commented out and the code above is added since i can't get the reqparser to run with custom types
+    # on the ubuntu machine for some unknown reason
+    #parser.add_argument('routine', required=True,
+    #                    type=parse_routine,
+    #                    help="Need a routine!",
+    #                    location="json")
+    #parser.add_argument('event_listeners', required=False, type=parse_event_listeners, default=[], location="json")
+    #return parser.parse_args()
 
 
 class ResourceEnum(Enum):

@@ -26,12 +26,12 @@ def say(text):
 def pprint(text):
     print(text)
 
+if _sound_play:
+	class _say(object):
+	    sound_handle = SoundClient()
 
-class _say(object):
-    sound_handle = SoundClient()
-
-    def __init__(self, text):
-        try:
-            self.sound_handle.say(text)
-        except AttributeError:
-            self.sound_handle.say(text)
+	    def __init__(self, text):
+		try:
+		    self.sound_handle.say(text)
+		except AttributeError:
+		    self.sound_handle.say(text)

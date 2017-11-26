@@ -6,3 +6,6 @@ rdflib
 reimport
 SpeechRecognition
 flask_cors
+flask
+flask_restful
+requests
